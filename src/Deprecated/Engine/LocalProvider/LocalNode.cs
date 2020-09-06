@@ -28,7 +28,7 @@ namespace Microsoft.Build.BuildEngine
         static LocalNode()
         {
             AppDomain currentDomain = AppDomain.CurrentDomain;
-            currentDomain.UnhandledException += new UnhandledExceptionEventHandler(UnhandledExceptionHandler);
+            currentDomain.UnhandledException += UnhandledExceptionHandler;
         }
         #endregion
 
@@ -151,15 +151,9 @@ namespace Microsoft.Build.BuildEngine
             // to start up its communication threads. This can happen if the node is started with /nodemode:x
             // and no parent is running, or if the parent node has spawned a new process and then crashed 
             // before establishing communication with the child node.
-            if(writerThread != null)
-            {
-              writerThread.Join();
-            }
+            writerThread?.Join();
 
-            if (readerThread != null)
-            {
-                readerThread.Join();
-            }
+            readerThread?.Join();
 
             // Make sure the exit event is not set
             communicationThreadExitEvent.Reset();
@@ -176,7 +170,7 @@ namespace Microsoft.Build.BuildEngine
         /// <returns>True if events created successfully and false otherwise</returns>
         private static bool CreateGlobalEvents(int nodeNumber)
         {
-            bool createdNew = false;
+            bool createdNew;
             if (NativeMethods.IsUserAdministrator())
             {
                 EventWaitHandleSecurity mSec = new EventWaitHandleSecurity();
@@ -207,7 +201,7 @@ namespace Microsoft.Build.BuildEngine
 
             // Indicate to the parent process, this node is currently is ready to start to recieve requests
             globalNodeInUse = new EventWaitHandle(false, EventResetMode.ManualReset, LocalNodeProviderGlobalNames.NodeInUseEventName(nodeNumber));
-            
+
             // Used by the parent process to inform the child process to shutdown due to the child process
             // not recieving the initialization command.
             globalNodeErrorShutdown = new EventWaitHandle(false, EventResetMode.ManualReset, LocalNodeProviderGlobalNames.NodeErrorShutdownEventName(nodeNumber));
@@ -284,7 +278,7 @@ namespace Microsoft.Build.BuildEngine
 
                         if (eventType == 0 || /* nice shutdown due to shutdownEvent */
                             eventType == 1 || /* error shutdown due to globalNodeErrorShutdown */
-                            eventType == WaitHandle.WaitTimeout && !localNode.IsParentProcessAlive())
+                            (eventType == WaitHandle.WaitTimeout && !localNode.IsParentProcessAlive()))
                         {
                             continueRunning = false;
                             // If the exit is not triggered by running of shutdown method
@@ -336,7 +330,7 @@ namespace Microsoft.Build.BuildEngine
         #region Methods
 
         /// <summary>
-        /// This method is run in its own thread, it is responsible for reading messages sent from the parent process 
+        /// This method is run in its own thread, it is responsible for reading messages sent from the parent process
         /// through the shared memory region.
         /// </summary>
         private void SharedMemoryReaderThread()
@@ -448,7 +442,7 @@ namespace Microsoft.Build.BuildEngine
                 // accomplished by calling this method again with the ErrorShutdown handle
                 if ( shutdownLevel == Node.NodeShutdownLevel.BuildCompleteSuccess || shutdownLevel == Node.NodeShutdownLevel.BuildCompleteFailure )
                 {
-                    ShutdownNode(Node.NodeShutdownLevel.ErrorShutdown, false, true); 
+                    ShutdownNode(Node.NodeShutdownLevel.ErrorShutdown, false, true);
                 }
                 // Signal all the communication threads to exit
                 shutdownEvent.Set();
@@ -545,10 +539,7 @@ namespace Microsoft.Build.BuildEngine
             }
             finally
             {
-                if (node != null)
-                {
-                    node.ReportFatalCommunicationError(originalException, null);
-                }
+                node?.ReportFatalCommunicationError(originalException, null);
             }
         }
 
@@ -620,9 +611,9 @@ namespace Microsoft.Build.BuildEngine
         private static ManualResetEvent communicationThreadExitEvent = new ManualResetEvent(false);
         private static ManualResetEvent shutdownEvent = new ManualResetEvent(false);
         private static ManualResetEvent notInUseEvent = new ManualResetEvent(false);
-        
+
         /// <summary>
-        /// Indicates the node is now in use. This means the node has recieved an activate command with initialization 
+        /// Indicates the node is now in use. This means the node has recieved an activate command with initialization
         /// data from the parent procss
         /// </summary>
         private static ManualResetEvent inUseEvent    = new ManualResetEvent(false);
@@ -636,7 +627,7 @@ namespace Microsoft.Build.BuildEngine
         // Timeouts && Constants
         private const int inactivityTimeout   = 60 * 1000; // 60 seconds of inactivity to exit
         private const int parentCheckInterval = 5 * 1000; // Check if the parent process is there every 5 seconds
-	
+
         #endregion
 
     }

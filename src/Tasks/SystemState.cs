@@ -153,7 +153,7 @@ namespace Microsoft.Build.Tasks
             /// </summary>
             internal FileState(SerializationInfo info, StreamingContext context)
             {
-                ErrorUtilities.VerifyThrowArgumentNull(info, "info");
+                ErrorUtilities.VerifyThrowArgumentNull(info, nameof(info));
 
                 lastModified = new DateTime(info.GetInt64("mod"), (DateTimeKind)info.GetInt32("modk"));
                 assemblyName = (AssemblyNameExtension)info.GetValue("an", typeof(AssemblyNameExtension));
@@ -175,7 +175,7 @@ namespace Microsoft.Build.Tasks
             [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
             public void GetObjectData(SerializationInfo info, StreamingContext context)
             {
-                ErrorUtilities.VerifyThrowArgumentNull(info, "info");
+                ErrorUtilities.VerifyThrowArgumentNull(info, nameof(info));
 
                 info.AddValue("mod", lastModified.Ticks);
                 info.AddValue("modk", (int)lastModified.Kind);
@@ -244,7 +244,7 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         internal SystemState(SerializationInfo info, StreamingContext context)
         {
-            ErrorUtilities.VerifyThrowArgumentNull(info, "info");
+            ErrorUtilities.VerifyThrowArgumentNull(info, nameof(info));
 
             instanceLocalFileStateCache = (Hashtable)info.GetValue("fileState", typeof(Hashtable));
             isDirty = false;
@@ -252,11 +252,10 @@ namespace Microsoft.Build.Tasks
 
         /// <summary>
         /// Set the target framework paths.
-        /// This is used to optimize IO in the case of files requested from one 
+        /// This is used to optimize IO in the case of files requested from one
         /// of the FX folders.
         /// </summary>
-        /// <param name="providedFrameworkPaths"></param>
-        /// <param name="installedAssemblyTables"></param>
+        /// <param name="installedAssemblyTableInfos">List of Assembly Table Info.</param>
         internal void SetInstalledAssemblyInformation
         (
             AssemblyTableInfo[] installedAssemblyTableInfos
@@ -271,7 +270,7 @@ namespace Microsoft.Build.Tasks
         [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            ErrorUtilities.VerifyThrowArgumentNull(info, "info");
+            ErrorUtilities.VerifyThrowArgumentNull(info, nameof(info));
 
             info.AddValue("fileState", instanceLocalFileStateCache);
         }

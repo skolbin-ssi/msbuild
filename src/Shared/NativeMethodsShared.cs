@@ -378,21 +378,15 @@ namespace Microsoft.Build.Shared
             /// <returns></returns>
             private static ProcessorArchitectures ConvertSystemArchitecture(ushort arch)
             {
-                switch (arch)
+                return arch switch
                 {
-                    case PROCESSOR_ARCHITECTURE_INTEL:
-                        return ProcessorArchitectures.X86;
-                    case PROCESSOR_ARCHITECTURE_AMD64:
-                        return ProcessorArchitectures.X64;
-                    case PROCESSOR_ARCHITECTURE_ARM:
-                        return ProcessorArchitectures.ARM;
-                    case PROCESSOR_ARCHITECTURE_IA64:
-                        return ProcessorArchitectures.IA64;
-                    case PROCESSOR_ARCHITECTURE_ARM64:
-                        return ProcessorArchitectures.ARM64;
-                    default:
-                        return ProcessorArchitectures.Unknown;
-                }
+                    PROCESSOR_ARCHITECTURE_INTEL => ProcessorArchitectures.X86,
+                    PROCESSOR_ARCHITECTURE_AMD64 => ProcessorArchitectures.X64,
+                    PROCESSOR_ARCHITECTURE_ARM => ProcessorArchitectures.ARM,
+                    PROCESSOR_ARCHITECTURE_IA64 => ProcessorArchitectures.IA64,
+                    PROCESSOR_ARCHITECTURE_ARM64 => ProcessorArchitectures.ARM64,
+                    _ => ProcessorArchitectures.Unknown,
+                };
             }
 
             /// <summary>
@@ -826,9 +820,7 @@ namespace Microsoft.Build.Shared
                 fileModifiedTimeUtc = DateTime.MinValue;
 
                 WIN32_FILE_ATTRIBUTE_DATA data = new WIN32_FILE_ATTRIBUTE_DATA();
-                bool success = false;
-
-                success = GetFileAttributesEx(fullPath, 0, ref data);
+                bool success = GetFileAttributesEx(fullPath, 0, ref data);
                 if (success)
                 {
                     if ((data.fileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
@@ -976,9 +968,7 @@ namespace Microsoft.Build.Shared
                 }
 
                 WIN32_FILE_ATTRIBUTE_DATA data = new WIN32_FILE_ATTRIBUTE_DATA();
-                bool success = false;
-
-                success = NativeMethodsShared.GetFileAttributesEx(fullPath, 0, ref data);
+                bool success = NativeMethodsShared.GetFileAttributesEx(fullPath, 0, ref data);
 
                 if (success && (data.fileAttributes & NativeMethodsShared.FILE_ATTRIBUTE_DIRECTORY) == 0)
                 {
@@ -1027,7 +1017,7 @@ namespace Microsoft.Build.Shared
                 if (!handle.IsInvalid)
                 {
                     FILETIME ftCreationTime, ftLastAccessTime, ftLastWriteTime;
-                    if (!GetFileTime(handle, out ftCreationTime, out ftLastAccessTime, out ftLastWriteTime) != true)
+                    if (GetFileTime(handle, out ftCreationTime, out ftLastAccessTime, out ftLastWriteTime))
                     {
                         long fileTime = ((long)(uint)ftLastWriteTime.dwHighDateTime) << 32 |
                                         (long)(uint)ftLastWriteTime.dwLowDateTime;
@@ -1045,7 +1035,7 @@ namespace Microsoft.Build.Shared
         /// </summary>
         public static bool HResultSucceeded(int hr)
         {
-            return (hr >= 0);
+            return hr >= 0;
         }
 
         /// <summary>
@@ -1053,7 +1043,7 @@ namespace Microsoft.Build.Shared
         /// </summary>
         public static bool HResultFailed(int hr)
         {
-            return (hr < 0);
+            return hr < 0;
         }
 
         /// <summary>
@@ -1084,7 +1074,7 @@ namespace Microsoft.Build.Shared
             // Only when you create the process using the Process object
             // does the Process object retain the original handle.
 
-            Process thisProcess = null;
+            Process thisProcess;
             try
             {
                 thisProcess = Process.GetProcessById(processIdToKill);
@@ -1218,7 +1208,7 @@ namespace Microsoft.Build.Shared
                 }
             }
 
-            return (ParentID);
+            return ParentID;
         }
 
         /// <summary>
@@ -1586,9 +1576,7 @@ namespace Microsoft.Build.Shared
         internal static bool DirectoryExistsWindows(string fullPath)
         {
             NativeMethodsShared.WIN32_FILE_ATTRIBUTE_DATA data = new NativeMethodsShared.WIN32_FILE_ATTRIBUTE_DATA();
-            bool success = false;
-
-            success = NativeMethodsShared.GetFileAttributesEx(fullPath, 0, ref data);
+            bool success = NativeMethodsShared.GetFileAttributesEx(fullPath, 0, ref data);
             return success && (data.fileAttributes & NativeMethodsShared.FILE_ATTRIBUTE_DIRECTORY) != 0;
         }
 
@@ -1602,9 +1590,7 @@ namespace Microsoft.Build.Shared
         internal static bool FileExistsWindows(string fullPath)
         {
             NativeMethodsShared.WIN32_FILE_ATTRIBUTE_DATA data = new NativeMethodsShared.WIN32_FILE_ATTRIBUTE_DATA();
-            bool success = false;
-
-            success = NativeMethodsShared.GetFileAttributesEx(fullPath, 0, ref data);
+            bool success = NativeMethodsShared.GetFileAttributesEx(fullPath, 0, ref data);
             return success && (data.fileAttributes & NativeMethodsShared.FILE_ATTRIBUTE_DIRECTORY) == 0;
         }
 

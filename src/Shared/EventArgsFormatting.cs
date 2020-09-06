@@ -200,6 +200,7 @@ namespace Microsoft.Build.Shared
         /// <param name="columnNumber">column number (0 if n/a)</param>
         /// <param name="endColumnNumber">end column number (0 if n/a)</param>
         /// <param name="threadId">thread id</param>
+        /// <param name="logOutputProperties">log output properties</param>
         /// <returns>The formatted message string.</returns>
         internal static string FormatEventMessage
         (
@@ -227,7 +228,7 @@ namespace Microsoft.Build.Shared
             }
             */
 
-            if ((file == null) || (file.Length == 0))
+            if (string.IsNullOrEmpty(file))
             {
                 format.Append("MSBUILD : ");    // Should not be localized.
             }
@@ -280,7 +281,7 @@ namespace Microsoft.Build.Shared
                 }
             }
 
-            if ((subcategory != null) && (subcategory.Length != 0))
+            if (!string.IsNullOrEmpty(subcategory))
             {
                 format.Append("{9} ");
             }
@@ -319,7 +320,7 @@ namespace Microsoft.Build.Shared
             }
 
             // A null message is allowed and is to be treated as a blank line.
-            if (null == message)
+            if (message == null)
             {
                 message = String.Empty;
             }
@@ -332,12 +333,12 @@ namespace Microsoft.Build.Shared
 
             for (int i = 0; i < lines.Length; i++)
             {
-                formattedMessage.Append(String.Format(
+                formattedMessage.AppendFormat(
                         CultureInfo.CurrentCulture, finalFormat,
                         threadId, file,
                         lineNumber, columnNumber, category, code,
                         lines[i], endLineNumber, endColumnNumber,
-                        subcategory, projectFile, logOutputProperties));
+                        subcategory, projectFile, logOutputProperties);
 
                 if (i < (lines.Length - 1))
                 {

@@ -91,24 +91,14 @@ namespace Microsoft.Build.Tasks
                 return null;
             }
 
-            AssemblyReferenceType referenceType;
             AssemblyType assemblyType = GetItemAssemblyType(item);
-            switch (assemblyType)
+            AssemblyReferenceType referenceType = assemblyType switch
             {
-                case AssemblyType.Managed:
-                    referenceType = AssemblyReferenceType.ManagedAssembly;
-                    break;
-                case AssemblyType.Native:
-                    referenceType = AssemblyReferenceType.NativeAssembly;
-                    break;
-                case AssemblyType.Satellite:
-                    referenceType = AssemblyReferenceType.ManagedAssembly;
-                    break;
-                default:
-                    referenceType = AssemblyReferenceType.Unspecified;
-                    break;
-            }
-
+                AssemblyType.Managed => AssemblyReferenceType.ManagedAssembly,
+                AssemblyType.Native => AssemblyReferenceType.NativeAssembly,
+                AssemblyType.Satellite => AssemblyReferenceType.ManagedAssembly,
+                _ => AssemblyReferenceType.Unspecified,
+            };
             DependencyType dependencyType = GetItemDependencyType(item);
             AssemblyReference assembly;
             if (dependencyType == DependencyType.Install)
@@ -251,12 +241,12 @@ namespace Microsoft.Build.Tasks
                     // Don't need publicKeyToken attribute for non-ClickOnce case
                     publicKeyToken = null;
                     // Language attribute should be omitted if neutral
-                    if (String.Compare(culture, "neutral", StringComparison.OrdinalIgnoreCase) == 0)
+                    if (String.Equals(culture, "neutral", StringComparison.OrdinalIgnoreCase))
                     {
                         culture = null;
                     }
                     // WinXP loader doesn't understand "msil"
-                    if (String.Compare(_processorArchitecture, "msil", StringComparison.OrdinalIgnoreCase) == 0)
+                    if (String.Equals(_processorArchitecture, "msil", StringComparison.OrdinalIgnoreCase))
                     {
                         _processorArchitecture = null;
                     }
@@ -329,7 +319,7 @@ namespace Microsoft.Build.Tasks
             }
             foreach (FileReference file in _manifest.FileReferences)
             {
-                if (String.Compare(targetPath, file.TargetPath, StringComparison.OrdinalIgnoreCase) == 0)
+                if (String.Equals(targetPath, file.TargetPath, StringComparison.OrdinalIgnoreCase))
                 {
                     return file;
                 }

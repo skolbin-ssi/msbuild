@@ -41,8 +41,7 @@ namespace Microsoft.Build.BuildEngine
             if (configuration != null)
             {
                 // Split out the parameter sets based on ;
-                string[] parameters;
-                parameters = configuration.Split(parameterDelimiters);
+                string[] parameters = configuration.Split(parameterDelimiters);
                 // Go through each of the parameter name value pairs and split them appart
                 for (int param = 0; param < parameters.Length; param++)
                 {
@@ -56,7 +55,7 @@ namespace Microsoft.Build.BuildEngine
                         }
                         else // Only the parameter name is known, this could be for a boolean parameter
                         {
-                            ApplyParameter(parameters[param], null); 
+                            ApplyParameter(parameters[param], null);
                         }
                     }
                 }
@@ -122,9 +121,9 @@ namespace Microsoft.Build.BuildEngine
         /// </summary>
         public void ApplyParameter(string parameterName, string parameterValue)
         {
-            ErrorUtilities.VerifyThrowArgumentNull(parameterName, "parameterName");
+            ErrorUtilities.VerifyThrowArgumentNull(parameterName, nameof(parameterName));
 
-            if (0 == String.Compare(parameterName, "MAXCPUCOUNT", StringComparison.OrdinalIgnoreCase))
+            if (String.Equals(parameterName, "MAXCPUCOUNT", StringComparison.OrdinalIgnoreCase))
             {
                  try
                 {
@@ -139,11 +138,11 @@ namespace Microsoft.Build.BuildEngine
                     //
                 }
             }
-            else if (0 == String.Compare(parameterName, "MSBUILDLOCATION", StringComparison.OrdinalIgnoreCase))
+            else if (String.Equals(parameterName, "MSBUILDLOCATION", StringComparison.OrdinalIgnoreCase))
             {
                 this.locationOfMSBuildExe = parameterValue;
             }
-            else if (0 == String.Compare(parameterName, "NODEREUSE", StringComparison.OrdinalIgnoreCase))
+            else if (String.Equals(parameterName, "NODEREUSE", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
@@ -208,7 +207,7 @@ namespace Microsoft.Build.BuildEngine
             // on its behalf
             if (nodeData[nodeIndex].NodeState != NodeState.Launched)
             {
-                NodeStatus nodeStatus = new NodeStatus(requestId, false, 0, 0, 0, (nodeData[nodeIndex].NodeState == NodeState.LaunchInProgress));
+                NodeStatus nodeStatus = new NodeStatus(requestId, false, 0, 0, 0, nodeData[nodeIndex].NodeState == NodeState.LaunchInProgress);
                 engineCallback.PostStatus(nodeData[nodeIndex].NodeId, nodeStatus, false);
             }
             else if (!IsNodeProcessAliveOrUninitialized(nodeIndex))
@@ -249,7 +248,7 @@ namespace Microsoft.Build.BuildEngine
                             }
                             ThreadStart threadState = new ThreadStart(this.LaunchNodeAndPostBuildRequest);
                             Thread taskThread = new Thread(threadState);
-                            taskThread.Name = "MSBuild Node Launcher";                            
+                            taskThread.Name = "MSBuild Node Launcher";
                             taskThread.Start();
                         }
                         nodeData[nodeIndex].TargetList.AddFirst(new LinkedListNode<BuildRequest>(buildRequest));
@@ -293,10 +292,10 @@ namespace Microsoft.Build.BuildEngine
             SendShutdownRequests(nodeShutdownLevel);
 
             DateTime startTime = DateTime.Now;
-            
+
             // Wait for all nodes to shutdown
             bool timeoutExpired = false;
-            
+
             // Loop until we are ready to shutdown. We are ready to shutdown when
             // all nodes either have sent their shutdown completed response or they are dead.
             // Secondly, we will exit the loop if our shudtownTimeout has expired
@@ -316,7 +315,7 @@ namespace Microsoft.Build.BuildEngine
                 {
                     //Terminate all of the nodes which have valid processId's but for which we
                     // have not recieved a shutdown response
-                    if ((nodeInfo.ProcessId > 0 && !nodeInfo.ShutdownResponseReceived))
+                    if (nodeInfo.ProcessId > 0 && !nodeInfo.ShutdownResponseReceived)
                     {
                         TerminateChildNode(nodeInfo.ProcessId);
                     }
@@ -364,7 +363,7 @@ namespace Microsoft.Build.BuildEngine
         /// </summary>
         public void UpdateSettings
         (
-            bool enableCentralizedLogging, 
+            bool enableCentralizedLogging,
             bool enableOnlyLogCriticalEvents,
             bool useBreadthFirstTraversalSetting
         )
@@ -478,10 +477,9 @@ namespace Microsoft.Build.BuildEngine
             {
                 return false;
             }
-            
+
             try
             {
-
                 bool isUninitialized = nodeData[nodeId].ProcessId == LocalNodeInfo.unInitializedProcessId;
 
                 if (isUninitialized)
@@ -719,7 +717,7 @@ namespace Microsoft.Build.BuildEngine
             finally
             {
                 // Make sure to decrement the active node count if the communication has failed
-                if (nodeConnected != true)
+                if (!nodeConnected)
                 {
                     DecreaseActiveNodeCount(nodeData[nodeIndex].NodeId);
                     nodeData[nodeIndex].CommunicationFailed = true;
@@ -729,7 +727,7 @@ namespace Microsoft.Build.BuildEngine
 
         /// <summary>
         /// This function attempts to find out if there is currently a node running
-        /// for a given index. The node is running if the global mutex with a 
+        /// for a given index. The node is running if the global mutex with a
         /// "Node_" + nodeId + "_ActiveReady" as a name was created
         /// </summary>
         private static  bool checkIfNodeActive(int nodeNumber)
@@ -747,10 +745,7 @@ namespace Microsoft.Build.BuildEngine
             }
             finally
             {
-                if (nodeActiveHandle != null)
-                {
-                    nodeActiveHandle.Close();
-                }
+                nodeActiveHandle?.Close();
             }
 
             return nodeIsActive;
@@ -778,7 +773,7 @@ namespace Microsoft.Build.BuildEngine
                     startInfo.hStdInput = NativeMethods.InvalidHandle;
                     startInfo.hStdOutput = NativeMethods.InvalidHandle;
                     startInfo.dwFlags = NativeMethods.STARTF_USESTDHANDLES;
-                    dwCreationFlags = dwCreationFlags | NativeMethods.CREATE_NO_WINDOW;
+                    dwCreationFlags |= NativeMethods.CREATE_NO_WINDOW;
                 }
 
                 NativeMethods.SECURITY_ATTRIBUTES pSec = new NativeMethods.SECURITY_ATTRIBUTES();
@@ -808,10 +803,7 @@ namespace Microsoft.Build.BuildEngine
             finally
             {
                 // Dispose before losing scope
-                if (nodeReadyEvent != null)
-                {
-                    nodeReadyEvent.Close();
-                }
+                nodeReadyEvent?.Close();
 
                 if (exitedDueToError)
                 {
@@ -826,7 +818,7 @@ namespace Microsoft.Build.BuildEngine
         private void ReportNodeCommunicationFailure
         (
             int nodeIndex,
-            Exception innerException, 
+            Exception innerException,
             bool decreaseActiveNodeCount
         )
         {
@@ -851,7 +843,7 @@ namespace Microsoft.Build.BuildEngine
                 // We can't really do anything except re-throw so this problem can be diagnosed.
                 throw wrappedException;
             }
-            
+
             engineCallback.PostStatus(nodeData[nodeIndex].NodeId, nodeStatus, false);
         }
 

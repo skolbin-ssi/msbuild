@@ -631,7 +631,7 @@ namespace Microsoft.Build.Tasks.Deployment.ManifestUtilities
                     {
                         targetPathList.Add(key, false);
                     }
-                    else if (targetPathList[key] == false)
+                    else if (!targetPathList[key])
                     {
                         OutputMessages.AddWarningMessage("GenerateManifest.DuplicateTargetPath", assembly.ToString());
                         targetPathList[key] = true; // only warn once per path
@@ -674,7 +674,7 @@ namespace Microsoft.Build.Tasks.Deployment.ManifestUtilities
                     {
                         targetPathList.Add(key, false);
                     }
-                    else if (targetPathList[key] == false)
+                    else if (!targetPathList[key])
                     {
                         OutputMessages.AddWarningMessage("GenerateManifest.DuplicateTargetPath", file.TargetPath);
                         targetPathList[key] = true; // only warn once per path
@@ -704,7 +704,7 @@ namespace Microsoft.Build.Tasks.Deployment.ManifestUtilities
             }
             else
             {
-                if (assembly.AssemblyIdentity != null && assembly.AssemblyIdentity.IsInFramework(Constants.DotNetFrameworkIdentifier, TargetFrameworkVersion))
+                if (assembly.AssemblyIdentity?.IsInFramework(Constants.DotNetFrameworkIdentifier, TargetFrameworkVersion) == true)
                 {
                     // if the binary is targeting v4.0 and it has the transparent attribute then we may allow partially trusted callers.
                     if (assembly.IsPrimary

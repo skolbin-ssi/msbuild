@@ -263,9 +263,8 @@ namespace Microsoft.Build.BuildEngine.Shared
 
             string[] parts = path.Split(directorySeparatorCharacters);
             string pathRoot;
-            int startingElement=0;
-
             bool isUnc = path.StartsWith(directorySeparator + directorySeparator, StringComparison.Ordinal);
+            int startingElement;
             if (isUnc)
             {
                 pathRoot = directorySeparator + directorySeparator;
@@ -278,7 +277,7 @@ namespace Microsoft.Build.BuildEngine.Shared
             else
             {
                 // Is it relative?
-                if (path.Length>2 && path[1] == ':')
+                if (path.Length > 2 && path[1] == ':')
                 {
                     // Not relative
                     pathRoot = parts[0] + directorySeparator;
@@ -511,7 +510,7 @@ namespace Microsoft.Build.BuildEngine.Shared
         /// <returns></returns>
         internal static bool IsDirectorySeparator(char c)
         {
-            return (c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar);
+            return c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar;
         }
         /// <summary>
         /// Removes the current directory converting the file back to relative path 
@@ -1243,8 +1242,7 @@ namespace Microsoft.Build.BuildEngine.Shared
             // 2) if the extension is three characters, and the filename contains the * wildcard, it matches files with longer
             //    extensions that start with the same three characters e.g. "*.htm" would match both "file.htm" and "file.html"
             bool needToEnforceExtensionLength =
-                    (extensionPart != null) &&
-                    (extensionPart.IndexOf('*') == -1)
+                    (extensionPart?.IndexOf('*') == -1)
                 &&
                     (extensionPart.EndsWith("?", StringComparison.Ordinal)
                 ||
@@ -1256,9 +1254,9 @@ namespace Microsoft.Build.BuildEngine.Shared
              */
             GetFilesRecursive(listOfFiles, fixedDirectoryPart, wildcardDirectoryPart,
                 // if using the regular expression, ignore the file pattern
-                (matchWithRegex ? null : filenamePart), (needToEnforceExtensionLength ? extensionPart.Length : 0),
+                matchWithRegex ? null : filenamePart, needToEnforceExtensionLength ? extensionPart.Length : 0,
                 // if using the file pattern, ignore the regular expression
-                (matchWithRegex ? new Regex(matchFileExpression, RegexOptions.IgnoreCase) : null),
+                matchWithRegex ? new Regex(matchFileExpression, RegexOptions.IgnoreCase) : null,
                 needsRecursion, projectDirectory, stripProjectDirectory, getFileSystemEntries);
 
             /*

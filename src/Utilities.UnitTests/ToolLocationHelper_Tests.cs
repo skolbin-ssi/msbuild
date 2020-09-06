@@ -715,17 +715,11 @@ namespace Microsoft.Build.UnitTests
         {
             string net20Path = ToolLocationHelper.GetPathToDotNetFrameworkFile("MSBuild.exe", TargetDotNetFrameworkVersion.Version20);
 
-            if (net20Path != null)
-            {
-                net20Path.ShouldBe(ToolLocationHelper.GetPathToBuildToolsFile("MSBuild.exe", "2.0"));
-            }
+            net20Path?.ShouldBe(ToolLocationHelper.GetPathToBuildToolsFile("MSBuild.exe", "2.0"));
 
             string net35Path = ToolLocationHelper.GetPathToDotNetFrameworkFile("MSBuild.exe", TargetDotNetFrameworkVersion.Version35);
 
-            if (net35Path != null)
-            {
-                net35Path.ShouldBe(ToolLocationHelper.GetPathToBuildToolsFile("MSBuild.exe", "3.5"));
-            }
+            net35Path?.ShouldBe(ToolLocationHelper.GetPathToBuildToolsFile("MSBuild.exe", "3.5"));
 
             ToolLocationHelper.GetPathToDotNetFrameworkFile("MSBuild.exe", TargetDotNetFrameworkVersion.Version40).ShouldBe(ToolLocationHelper.GetPathToBuildToolsFile("MSBuild.exe", "4.0"));
 
@@ -1965,12 +1959,10 @@ namespace Microsoft.Build.UnitTests
         [Trait("Category", "mono-osx-failing")]
         public void GetPathToReferenceAssembliesDefaultLocation45()
         {
-            FrameworkNameVersioning frameworkName = null;
-            IList<string> directories = null;
             if (ToolLocationHelper.GetPathToDotNetFrameworkReferenceAssemblies(TargetDotNetFrameworkVersion.Version45) != null)
             {
-                frameworkName = new FrameworkNameVersioning(".NETFramework", new Version("4.5"));
-                directories = ToolLocationHelper.GetPathToReferenceAssemblies(frameworkName);
+                FrameworkNameVersioning frameworkName = new FrameworkNameVersioning(".NETFramework", new Version("4.5"));
+                IList<string> directories = ToolLocationHelper.GetPathToReferenceAssemblies(frameworkName);
                 directories.Count.ShouldBe(1); // "Expected the method to return one path."
 
                 string referenceAssemblyPath = ToolLocationHelper.GetPathToDotNetFrameworkReferenceAssemblies(TargetDotNetFrameworkVersion.Version45);
@@ -2786,7 +2778,7 @@ namespace Microsoft.Build.UnitTests
 
         private static string CreateNewFrameworkAndGetAssembliesPath(TestEnvironment env, string frameworkName, string frameworkVersion, string rootDir)
         {
-            string frameworkListXml = null;
+            string frameworkListXml;
             if (NativeMethodsShared.IsMono)
             {
                 // Mono uses an extra attribute to point to the location of the corresponding
@@ -4683,52 +4675,52 @@ namespace Microsoft.Build.UnitTests
         {
             if (baseKey == Registry.CurrentUser)
             {
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "Windows", "MyPlatform" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "v1.0", "1.0" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "MyAssembly" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\1.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\1.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "MyAssembly" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "v1.1", "1.0", "2.0", "3.0" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\1.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\1.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "2.0" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "4.0", "5.0", "6.0", "9.0" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "MyAssembly" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\5.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\5.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { string.Empty };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "1.0" };
                 }
@@ -4736,22 +4728,22 @@ namespace Microsoft.Build.UnitTests
 
             if (baseKey == Registry.LocalMachine)
             {
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "Windows" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "v2.0" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0\ExtensionSDKs", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "MyAssembly" };
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0\ExtensionSDKs\MyAssembly", StringComparison.OrdinalIgnoreCase))
                 {
                     return new[] { "3.0" };
                 }
@@ -4771,54 +4763,54 @@ namespace Microsoft.Build.UnitTests
         {
             if (baseKey == Registry.CurrentUser)
             {
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly\1.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly\1.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows\\v1.0\\ExtensionSDKs\\MyAssembly\\1.0");
                 }
 
                 // This has a v in the sdk version and should not be found but we need a real path in case it is so it will show up in the returned list and fail the test.
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly\v1.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly\v1.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows\\v1.0\\ExtensionSDKs\\MyAssembly\\1.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\1.0\ExtensionSDKs\MyAssembly\2.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\1.0\ExtensionSDKs\MyAssembly\2.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows\\1.0\\ExtensionSDKs\\MyAssembly\\2.0");
                 }
 
                 // This has a set of bad char in the returned directory so it should not be allowed.
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly\3.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0\ExtensionSDKs\MyAssembly\3.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return _fakeStructureRoot + @"\Windows\1.0\ExtensionSDKs\MyAssembly\<>?/";
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\5.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\5.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "MyPlatform\\5.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "SomeOtherPlace\\MyPlatformOtherLocation\\4.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\6.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\6.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows Kits\\6.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\9.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\9.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "MyPlatform\\9.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0\ExtensionSDKs\MyAssembly\1.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\MyPlatform\4.0\ExtensionSDKs\MyAssembly\1.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "SomeOtherPlace\\MyPlatformOtherLocation\\4.0\\ExtensionSDKs\\MyAssembly\\1.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v1.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows\\1.0");
                 }
@@ -4826,12 +4818,12 @@ namespace Microsoft.Build.UnitTests
 
             if (baseKey == Registry.LocalMachine)
             {
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0\ExtensionSDKs\MyAssembly\3.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0\ExtensionSDKs\MyAssembly\3.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows\\2.0\\ExtensionSDKs\\MyAssembly\\3.0");
                 }
 
-                if (string.Compare(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0", StringComparison.OrdinalIgnoreCase) == 0)
+                if (string.Equals(subKey, @"Software\Microsoft\MicrosoftSDKs\Windows\v2.0", StringComparison.OrdinalIgnoreCase))
                 {
                     return Path.Combine(_fakeStructureRoot, "Windows\\2.0");
                 }
