@@ -13,7 +13,6 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using System.Text;
 using System.Threading;
 using Microsoft.Build.Utilities;
@@ -736,11 +735,13 @@ namespace Microsoft.Build.Shared
         /// <param name="first"></param>
         /// <param name="second"></param>
         /// <param name="currentDirectory"></param>
+        /// <param name="alwaysIgnoreCase"></param>
         /// <returns></returns>
-        internal static bool ComparePathsNoThrow(string first, string second, string currentDirectory)
+        internal static bool ComparePathsNoThrow(string first, string second, string currentDirectory, bool alwaysIgnoreCase = false)
         {
+            StringComparison pathComparison = alwaysIgnoreCase ? StringComparison.OrdinalIgnoreCase : PathComparison;
             // perf: try comparing the bare strings first
-            if (string.Equals(first, second, PathComparison))
+            if (string.Equals(first, second, pathComparison))
             {
                 return true;
             }
@@ -748,7 +749,7 @@ namespace Microsoft.Build.Shared
             var firstFullPath = NormalizePathForComparisonNoThrow(first, currentDirectory);
             var secondFullPath = NormalizePathForComparisonNoThrow(second, currentDirectory);
 
-            return string.Equals(firstFullPath, secondFullPath, PathComparison);
+            return string.Equals(firstFullPath, secondFullPath, pathComparison);
         }
 
         /// <summary>

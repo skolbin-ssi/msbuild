@@ -347,6 +347,14 @@ namespace Microsoft.Build.Evaluation
             }
         }
 
+        ///<summary>
+        /// Hash the string independent of bitness and target framework.
+        /// </summary>
+        internal static int StableStringHash(string toHash)
+        {
+            return CommunicationsUtilities.GetHashCode(toHash);
+        }
+
         /// <summary>
         /// Returns true if a task host exists that can service the requested runtime and architecture
         /// values, and false otherwise.
@@ -506,9 +514,9 @@ namespace Microsoft.Build.Evaluation
             return NuGetFramework.Value.GetTargetPlatformVersion(tfm, versionPartCount);
         }
 
-        internal static bool AreFeaturesEnabled(string wave)
+        internal static bool AreFeaturesEnabled(Version wave)
         {
-            return string.IsNullOrEmpty(wave) ? false : ChangeWaves.AreFeaturesEnabled(wave);
+            return ChangeWaves.AreFeaturesEnabled(wave);
         }
 
         public static string GetCurrentToolsDirectory()

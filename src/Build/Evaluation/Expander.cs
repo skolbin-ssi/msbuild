@@ -5,15 +5,12 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Build.Collections;
 using Microsoft.Build.Execution;
@@ -4009,9 +4006,17 @@ namespace Microsoft.Build.Evaluation
                                 return true;
                             }
                         }
-                        else if (string.Equals(_methodMethodName, nameof(IntrinsicFunctions.AreFeaturesEnabled), StringComparison.OrdinalIgnoreCase))
+                        else if (string.Equals(_methodMethodName, nameof(IntrinsicFunctions.StableStringHash), StringComparison.OrdinalIgnoreCase))
                         {
                             if (TryGetArg(args, out string arg0))
+                            {
+                                returnVal = IntrinsicFunctions.StableStringHash(arg0);
+                                return true;
+                            }
+                        }
+                        else if (string.Equals(_methodMethodName, nameof(IntrinsicFunctions.AreFeaturesEnabled), StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (TryGetArg(args, out Version arg0))
                             {
                                 returnVal = IntrinsicFunctions.AreFeaturesEnabled(arg0);
                                 return true;
@@ -4295,6 +4300,30 @@ namespace Microsoft.Build.Evaluation
                 }
 
                 return TryConvertToInt(args[0], out arg0);
+            }
+
+            private static bool TryGetArg(object[] args, out Version arg0)
+            {
+                if (args.Length != 1)
+                {
+                    arg0 = default;
+                    return false;
+                }
+
+                return TryConvertToVersion(args[0], out arg0);
+            }
+
+            private static bool TryConvertToVersion(object value, out Version arg0)
+            {
+                string val = value as string;
+
+                if (string.IsNullOrEmpty(val) || !Version.TryParse(val, out arg0))
+                {
+                    arg0 = default;
+                    return false;
+                }
+
+                return true;
             }
 
             private static bool TryConvertToInt(object value, out int arg0)

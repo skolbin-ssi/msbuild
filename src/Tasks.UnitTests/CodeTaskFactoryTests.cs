@@ -3,7 +3,6 @@
 
 using System.IO;
 using System;
-using System.Diagnostics;
 using System.Linq;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
@@ -1101,6 +1100,36 @@ namespace Microsoft.Build.UnitTests
                 Environment.SetEnvironmentVariable("TMP", oldTempPath);
                 FileUtilities.DeleteDirectoryNoThrow(newTempPath, true);
             }
+        }
+
+        /// <summary>
+        /// Test the simple case where we have a string parameter and we want to log that.
+        /// </summary>
+        [Fact]
+        public void RedundantMSBuildReferences()
+        {
+            string projectFileContents = @"
+                    <Project xmlns='http://schemas.microsoft.com/developer/msbuild/2003' ToolsVersion='msbuilddefaulttoolsversion'>
+                        <UsingTask TaskName=`CustomTaskFromCodeFactory_RedundantMSBuildReferences` TaskFactory=`CodeTaskFactory` AssemblyFile=`$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll` >
+                         <ParameterGroup>     
+                             <Text/>
+                          </ParameterGroup>
+                            <Task>
+                              <Reference Include='$(MSBuildToolsPath)\Microsoft.Build.Framework.dll' />
+                              <Reference Include='$(MSBuildToolsPath)\Microsoft.Build.Utilities.Core.dll' />
+
+                                <Code>
+                                     Log.LogMessage(MessageImportance.High, Text);
+                                </Code>
+                            </Task>
+                        </UsingTask>
+                        <Target Name=`Build`>
+                            <CustomTaskFromCodeFactory_RedundantMSBuildReferences Text=`Hello, World!` />
+                        </Target>
+                    </Project>";
+
+            MockLogger mockLogger = Helpers.BuildProjectWithNewOMExpectSuccess(projectFileContents);
+            mockLogger.AssertLogContains("Hello, World!");
         }
     }
 #else
