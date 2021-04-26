@@ -30,7 +30,8 @@ namespace Microsoft.Build.Evaluation
             //  This is used only when evaluating an expression, which instantiates
             //  the items and then removes them
             protected readonly IItemFactory<I, I> _itemFactory;
-
+            internal ItemSpec<P, I> Spec => _itemSpec;
+            
             protected LazyItemOperation(OperationBuilder builder, LazyItemEvaluator<P, I, M, D> lazyEvaluator)
             {
                 _itemElement = builder.ItemElement;
@@ -161,10 +162,8 @@ namespace Microsoft.Build.Evaluation
                     {
                         return getEscapedValueFunc(_operationItem, itemType, name);
                     }
-                    else if (_capturedItems.ContainsKey(itemType))
+                    else if (_capturedItems.TryGetValue(itemType, out var item))
                     {
-                        var item = _capturedItems[itemType];
-
                         return getEscapedValueFunc(item, itemType, name);
                     }
                     else

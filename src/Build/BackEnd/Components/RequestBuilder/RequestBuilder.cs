@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Build.BackEnd.Logging;
-using Microsoft.Build.BackEnd.SdkResolution;
 using Microsoft.Build.Collections;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Eventing;
@@ -48,6 +47,11 @@ namespace Microsoft.Build.BackEnd
         /// The results used when a build request entry continues.
         /// </summary>
         private IDictionary<int, BuildResult> _continueResults;
+
+        /// <summary>
+        /// Queue of actions to call when a resource request is responded to.
+        /// </summary>
+        private ConcurrentQueue<Action<ResourceResponse>> _pendingResourceRequests;
 
         /// <summary>
         /// The task representing the currently-executing build request.
@@ -106,6 +110,7 @@ namespace Microsoft.Build.BackEnd
         {
             _terminateEvent = new ManualResetEvent(false);
             _continueEvent = new AutoResetEvent(false);
+            _pendingResourceRequests = new ConcurrentQueue<Action<ResourceResponse>>();
         }
 
         /// <summary>
@@ -122,6 +127,11 @@ namespace Microsoft.Build.BackEnd
         /// The event raised when the build request has completed.
         /// </summary>
         public event BuildRequestBlockedDelegate OnBuildRequestBlocked;
+
+        /// <summary>
+        /// The event raised when resources are requested.
+        /// </summary>
+        public event ResourceRequestDelegate OnResourceRequest;
 
         /// <summary>
         /// The current block type
@@ -217,6 +227,19 @@ namespace Microsoft.Build.BackEnd
 
             // Setting the continue event will wake up the build thread, which is suspended in StartNewBuildRequests.
             _continueEvent.Set();
+        }
+
+        /// <summary>
+        /// Continues a build request after receiving a resource response.
+        /// </summary>
+        public void ContinueRequestWithResources(ResourceResponse response)
+        {
+            ErrorUtilities.VerifyThrow(HasActiveBuildRequest, "Request not building");
+            ErrorUtilities.VerifyThrow(!_terminateEvent.WaitOne(0), "Request already terminated");
+            ErrorUtilities.VerifyThrow(!_pendingResourceRequests.IsEmpty, "No pending resource requests");
+            VerifyEntryInActiveOrWaitingState();
+
+            _pendingResourceRequests.Dequeue()(response);
         }
 
         /// <summary>
@@ -459,6 +482,61 @@ namespace Microsoft.Build.BackEnd
             _inMSBuildCallback = false;
         }
 
+        /// <summary>
+        /// Requests CPU resources from the scheduler.
+        /// </summary>
+        public int RequestCores(object monitorLockObject, int requestedCores, bool waitForCores)
+        {
+            ErrorUtilities.VerifyThrow(Monitor.IsEntered(monitorLockObject), "Not running under the given lock");
+            VerifyIsNotZombie();
+
+            // The task may be calling RequestCores from multiple threads and the call may be blocking, so in general, we have to maintain
+            // a queue of pending requests.
+            ResourceResponse responseObject = null;
+            using AutoResetEvent responseEvent = new AutoResetEvent(false);
+            _pendingResourceRequests.Enqueue((ResourceResponse response) =>
+            {
+                responseObject = response;
+                responseEvent.Set();
+            });
+
+            RaiseResourceRequest(ResourceRequest.CreateAcquireRequest(_requestEntry.Request.GlobalRequestId, requestedCores, waitForCores));
+
+            // Wait for one of two events to be signaled: 1) The build was canceled, 2) The response to our request was received.
+            WaitHandle[] waitHandles = new WaitHandle[] { _terminateEvent, responseEvent };
+            int waitResult;
+
+            // Drop the lock so that the same task can call ReleaseCores from other threads to unblock itself.
+            Monitor.Exit(monitorLockObject);
+            try
+            {
+                waitResult = WaitHandle.WaitAny(waitHandles);
+            }
+            finally
+            {
+                // Now re-take the lock before continuing.
+                Monitor.Enter(monitorLockObject);
+            }
+
+            if (waitResult == 0)
+            {
+                // We've been aborted.
+                throw new BuildAbortedException();
+            }
+
+            VerifyEntryInActiveOrWaitingState();
+            return responseObject.NumCores;
+        }
+
+        /// <summary>
+        /// Returns CPU resources to the scheduler.
+        /// </summary>
+        public void ReleaseCores(int coresToRelease)
+        {
+            VerifyIsNotZombie();
+            RaiseResourceRequest(ResourceRequest.CreateReleaseRequest(_requestEntry.Request.GlobalRequestId, coresToRelease));
+        }
+
         #endregion
 
         #region IBuildComponent Members
@@ -673,6 +751,15 @@ namespace Microsoft.Build.BackEnd
         private void VerifyEntryInActiveState()
         {
             ErrorUtilities.VerifyThrow(_requestEntry.State == BuildRequestEntryState.Active, "Entry is not in the Active state, it is in the {0} state.", _requestEntry.State);
+        }
+
+        /// <summary>
+        /// Asserts that the entry is in the active or waiting state.
+        /// </summary>
+        private void VerifyEntryInActiveOrWaitingState()
+        {
+            ErrorUtilities.VerifyThrow(_requestEntry.State == BuildRequestEntryState.Active || _requestEntry.State == BuildRequestEntryState.Waiting,
+                "Entry is not in the Active or Waiting state, it is in the {0} state.", _requestEntry.State);
         }
 
         /// <summary>
@@ -986,6 +1073,15 @@ namespace Microsoft.Build.BackEnd
         }
 
         /// <summary>
+        /// Invokes the OnResourceRequest event
+        /// </summary>
+        /// <param name="request"></param>
+        private void RaiseResourceRequest(ResourceRequest request)
+        {
+            OnResourceRequest?.Invoke(request);
+        }
+
+        /// <summary>
         /// This method is called to reset the current directory to the one appropriate for this project.  It should be called any time
         /// the project is resumed.
         /// If the directory does not exist, does nothing.
@@ -1019,7 +1115,12 @@ namespace Microsoft.Build.BackEnd
                 // Load the project
                 if (!_requestEntry.RequestConfiguration.IsLoaded)
                 {
-                    LoadProjectIntoConfiguration();
+                    _requestEntry.RequestConfiguration.LoadProjectIntoConfiguration(
+                        _componentHost,
+                        RequestEntry.Request.BuildRequestDataFlags,
+                        RequestEntry.Request.SubmissionId,
+                        _nodeLoggingContext.BuildEventContext.NodeId
+                    );
                 }
             }
             catch
@@ -1078,77 +1179,45 @@ namespace Microsoft.Build.BackEnd
             // Build the targets
             BuildResult result = await _targetBuilder.BuildTargets(_projectLoggingContext, _requestEntry, this, allTargets, _requestEntry.RequestConfiguration.BaseLookup, _cancellationTokenSource.Token);
 
+            result = _requestEntry.Request.ProxyTargets == null
+                ? result
+                : CopyTargetResultsFromProxyTargetsToRealTargets(result);
+
             if (MSBuildEventSource.Log.IsEnabled())
             {
                 MSBuildEventSource.Log.BuildProjectStop(_requestEntry.RequestConfiguration.ProjectFullPath, string.Join(", ", allTargets));
             }
 
             return result;
-        }
 
-        /// <summary>
-        /// Loads the project specified by the configuration's parameters into the configuration block.
-        /// </summary>
-        private void LoadProjectIntoConfiguration()
-        {
-            ErrorUtilities.VerifyThrow(!_requestEntry.RequestConfiguration.IsLoaded, "Already loaded the project for this configuration id {0}.", _requestEntry.RequestConfiguration.ConfigurationId);
-
-            _requestEntry.RequestConfiguration.InitializeProject(_componentHost.BuildParameters, LoadProjectFromFile);
-        }
-
-        private ProjectInstance LoadProjectFromFile()
-        {
-            if (_componentHost.BuildParameters.SaveOperatingEnvironment)
+            BuildResult CopyTargetResultsFromProxyTargetsToRealTargets(BuildResult resultFromTargetBuilder)
             {
-                try
+                var proxyTargetMapping = _requestEntry.Request.ProxyTargets.ProxyTargetToRealTargetMap;
+
+                var resultsCache = (IResultsCache)_componentHost.GetComponent(BuildComponentType.ResultsCache);
+                var cachedResult = resultsCache.GetResultsForConfiguration(_requestEntry.Request.ConfigurationId);
+
+                // Some proxy targets do not point to real targets. Exclude those.
+                foreach (var proxyMapping in proxyTargetMapping.Where(kvp => kvp.Value != null))
                 {
-                    NativeMethodsShared.SetCurrentDirectory(BuildParameters.StartupDirectory);
+                    var proxyTarget = proxyMapping.Key;
+                    var realTarget = proxyMapping.Value;
+
+                    var proxyTargetResult = resultFromTargetBuilder.ResultsByTarget[proxyTarget];
+
+                    // Update the results cache.
+                    cachedResult.AddResultsForTarget(
+                        realTarget,
+                        proxyTargetResult);
+
+                    // Update and return this one because TargetBuilder.BuildTargets did some mutations on it not present in the cached result.
+                    resultFromTargetBuilder.AddResultsForTarget(
+                        realTarget,
+                        proxyTargetResult);
                 }
-                catch (DirectoryNotFoundException)
-                {
-                    // Somehow the startup directory vanished. This can happen if build was started from a USB Key and it was removed.
-                    NativeMethodsShared.SetCurrentDirectory(
-                        BuildEnvironmentHelper.Instance.CurrentMSBuildToolsDirectory);
-                }
+
+                return resultFromTargetBuilder;
             }
-
-            Dictionary<string, string> globalProperties = new Dictionary<string, string>(MSBuildNameIgnoreCaseComparer.Default);
-
-            foreach (ProjectPropertyInstance property in _requestEntry.RequestConfiguration.GlobalProperties)
-            {
-                globalProperties.Add(property.Name, ((IProperty)property).EvaluatedValueEscaped);
-            }
-
-            string toolsVersionOverride = _requestEntry.RequestConfiguration.ExplicitToolsVersionSpecified ? _requestEntry.RequestConfiguration.ToolsVersion : null;
-
-            // Get the hosted ISdkResolverService.  This returns either the MainNodeSdkResolverService or the OutOfProcNodeSdkResolverService depending on who created the current RequestBuilder
-            ISdkResolverService sdkResolverService = _componentHost.GetComponent(BuildComponentType.SdkResolverService) as ISdkResolverService;
-
-            // Use different project load settings if the build request indicates to do so
-            ProjectLoadSettings projectLoadSettings = _componentHost.BuildParameters.ProjectLoadSettings;
-
-            if (_requestEntry.Request.BuildRequestDataFlags.HasFlag(BuildRequestDataFlags.IgnoreMissingEmptyAndInvalidImports))
-            {
-                projectLoadSettings |= ProjectLoadSettings.IgnoreMissingImports | ProjectLoadSettings.IgnoreInvalidImports | ProjectLoadSettings.IgnoreEmptyImports;
-            }
-
-            return new ProjectInstance(
-                _requestEntry.RequestConfiguration.ProjectFullPath,
-                globalProperties,
-                toolsVersionOverride,
-                _componentHost.BuildParameters,
-                _nodeLoggingContext.LoggingService,
-                new BuildEventContext(
-                    _requestEntry.Request.SubmissionId,
-                    _nodeLoggingContext.BuildEventContext.NodeId,
-                    BuildEventContext.InvalidEvaluationId,
-                    BuildEventContext.InvalidProjectInstanceId,
-                    BuildEventContext.InvalidProjectContextId,
-                    BuildEventContext.InvalidTargetId,
-                    BuildEventContext.InvalidTaskId),
-                sdkResolverService,
-                _requestEntry.Request.SubmissionId,
-                projectLoadSettings);
         }
 
         /// <summary>

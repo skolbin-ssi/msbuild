@@ -10,14 +10,12 @@ namespace Microsoft.Build.Framework
     /// <summary>
     /// Arguments for target started events
     /// </summary>
-    /// <remarks>
-    /// WARNING: marking a type [Serializable] without implementing
-    /// ISerializable imposes a serialization contract -- it is a
-    /// promise to never change the type's fields i.e. the type is
-    /// immutable; adding new fields in the next version of the type
-    /// without following certain special FX guidelines, can break both
-    /// forward and backward compatibility
-    /// </remarks>    
+    // WARNING: marking a type [Serializable] without implementing
+    // ISerializable imposes a serialization contract -- it is a
+    // promise to never change the type's fields i.e. the type is
+    // immutable; adding new fields in the next version of the type
+    // without following certain special FX guidelines, can break both
+    // forward and backward compatibility    
     [Serializable]
     public class TargetStartedEventArgs : BuildStatusEventArgs
     {
@@ -177,5 +175,45 @@ namespace Microsoft.Build.Framework
         /// Why this target was built by its parent.
         /// </summary>
         public TargetBuiltReason BuildReason => buildReason;
+
+        public override string Message
+        {
+            get
+            {
+                if (RawMessage == null)
+                {
+                    lock (locker)
+                    {
+                        if (RawMessage == null)
+                        {
+                            if (string.Equals(projectFile, targetFile, StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (!string.IsNullOrEmpty(parentTarget))
+                                {
+                                    RawMessage = FormatResourceStringIgnoreCodeAndKeyword("TargetStartedProjectDepends", targetName, projectFile, parentTarget);
+                                }
+                                else
+                                {
+                                    RawMessage = FormatResourceStringIgnoreCodeAndKeyword("TargetStartedProjectEntry", targetName, projectFile);
+                                }
+                            }
+                            else
+                            {
+                                if (!string.IsNullOrEmpty(parentTarget))
+                                {
+                                    RawMessage = FormatResourceStringIgnoreCodeAndKeyword("TargetStartedFileProjectDepends", targetName, targetFile, projectFile, parentTarget);
+                                }
+                                else
+                                {
+                                    RawMessage = FormatResourceStringIgnoreCodeAndKeyword("TargetStartedFileProjectEntry", targetName, targetFile, projectFile);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return RawMessage;
+            }
+        }
     }
 }

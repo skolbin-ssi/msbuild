@@ -2231,7 +2231,7 @@ namespace Microsoft.Build.UnitTests.OM.Definition
                 <I1 Include='c1' M1='foo/bar.vb' M2='y'/>
                 <I1 Include='d1' M1='foo\foo\foo' M2='b'/>
                 <I1 Include='e1' M1='a/b/../c/./d' M2='1'/>
-                <I1 Include='f1' M1='{ ObjectModelHelpers.TempProjectDir }\b\c' M2='6'/>
+                <I1 Include='f1' M1='{ Environment.CurrentDirectory }\b\c' M2='6'/>
 
                 <I2 Include='a2' M1='FOO.TXT' m2='c'/>
                 <I2 Include='b2' M1='foo/bar.txt' m2='x'/>
@@ -2403,7 +2403,7 @@ namespace Microsoft.Build.UnitTests.OM.Definition
         }
 
         [Fact]
-        public void FailWithMatchingMultipleMetadata()
+        public void RemoveMatchingMultipleMetadata()
         {
             string content = ObjectModelHelpers.FormatProjectContentsWithItemGroupFragment(
                 @"<I1 Include='a1' M1='1' M2='a'/>
@@ -2418,12 +2418,16 @@ namespace Microsoft.Build.UnitTests.OM.Definition
 
                 <I2 Remove='@(I1)' MatchOnMetadata='M1;M2'/>");
 
-            Should.Throw<InvalidProjectFileException>(() => ObjectModelHelpers.CreateInMemoryProject(content))
-                .HelpKeyword.ShouldBe("MSBuild.OM_MatchOnMetadataIsRestrictedToOnlyOneReferencedItem");
+            Project project = ObjectModelHelpers.CreateInMemoryProject(content);
+            IEnumerable<ProjectItem> items = project.ItemsIgnoringCondition.Where(i => i.ItemType.Equals("I2"));
+            items.Count().ShouldBe(3);
+            items.ElementAt(0).EvaluatedInclude.ShouldBe("a2");
+            items.ElementAt(1).EvaluatedInclude.ShouldBe("c2");
+            items.ElementAt(2).EvaluatedInclude.ShouldBe("d2");
         }
 
         [Fact]
-        public void FailWithMultipleItemReferenceOnMatchingMetadata()
+        public void RemoveMultipleItemReferenceOnMatchingMetadata()
         {
             string content = ObjectModelHelpers.FormatProjectContentsWithItemGroupFragment(
                 @"<I1 Include='a1' M1='1' M2='a'/>
@@ -2443,8 +2447,9 @@ namespace Microsoft.Build.UnitTests.OM.Definition
 
                 <I3 Remove='@(I1);@(I2)' MatchOnMetadata='M1' />");
 
-            Should.Throw<InvalidProjectFileException>(() => ObjectModelHelpers.CreateInMemoryProject(content))
-                .HelpKeyword.ShouldBe("MSBuild.OM_MatchOnMetadataIsRestrictedToOnlyOneReferencedItem");
+            Project project = ObjectModelHelpers.CreateInMemoryProject(content);
+            IEnumerable<ProjectItem> items = project.ItemsIgnoringCondition.Where(i => i.ItemType.Equals("I3"));
+            items.ShouldBeEmpty();
         }
 
         [Fact]
@@ -2462,9 +2467,8 @@ namespace Microsoft.Build.UnitTests.OM.Definition
                 <I2 Include='d2' M1='y' m2='d'/>
 
                 <I2 Remove='%(I1.M1)' MatchOnMetadata='M1' />");
-
             Should.Throw<InvalidProjectFileException>(() => ObjectModelHelpers.CreateInMemoryProject(content))
-                .HelpKeyword.ShouldBe("MSBuild.OM_MatchOnMetadataIsRestrictedToOnlyOneReferencedItem");
+                .HelpKeyword.ShouldBe("MSBuild.OM_MatchOnMetadataIsRestrictedToReferencedItems");
         }
 
         [Fact]
@@ -2602,6 +2606,92 @@ namespace Microsoft.Build.UnitTests.OM.Definition
             };
 
             ObjectModelHelpers.AssertItemHasMetadata(expectedUpdate, items[0]);
+        }
+
+        [Theory]
+        [InlineData("abc", "def", "abc")]
+        [InlineData("abc", "de*", "abc")]
+        [InlineData("a*c", "def", "abc")]
+        [InlineData("abc", "def", "*bc")]
+        [InlineData("abc", "d*f", "*bc")]
+        [InlineData("*c", "d*f", "*bc")]
+        [InlineData("a*", "d*", "abc")]
+        public void UpdatesProceedInOrder(string first, string second, string third)
+        {
+            string contents = $@"
+<i Include='abc'>
+    <m1>m1_contents</m1>
+</i>
+<j Include='def'>
+    <m1>m1_contents</m1>
+</j>
+<i Update='{first}'>
+    <m1>first</m1>
+</i>
+<j Update='{second}'>
+    <m1>second</m1>
+</j>
+<i Update='{third}'>
+    <m1>third</m1>
+</i>
+";
+            IList<ProjectItem> items = ObjectModelHelpers.GetItemsFromFragment(contents, allItems: true);
+            Dictionary<string, string> expectedUpdatei = new Dictionary<string, string>
+            {
+                {"m1", "third" }
+            };
+            Dictionary<string, string> expectedUpdatej = new Dictionary<string, string>
+            {
+                {"m1", "second" }
+            };
+
+            ObjectModelHelpers.AssertItemHasMetadata(expectedUpdatei, items[0]);
+            ObjectModelHelpers.AssertItemHasMetadata(expectedUpdatej, items[1]);
+        }
+
+        [Fact]
+        public void UpdatingIndividualItemsProceedsInOrder()
+        {
+            string contents = @"
+<i Include='a;b;c'>
+    <m1>m1_contents</m1>
+</i>
+<i Update='a'>
+    <m1>second</m1>
+</i>
+<i Update='b'>
+    <m1>third</m1>
+</i>
+<i Update='c'>
+    <m1>fourth</m1>
+</i>
+<afterFirst Include='@(i)' />
+<i Update='*'>
+    <m1>sixth</m1>
+</i>
+<afterSecond Include='@(i)' />
+<i Update='b'>
+    <m1>seventh</m1>
+</i>
+<afterThird Include='@(i)' />
+<i Update='c'>
+    <m1>eighth</m1>
+</i>
+<afterFourth Include='@(i)' />
+";
+            IList<ProjectItem> items = ObjectModelHelpers.GetItemsFromFragment(contents, allItems: true);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "second", items[3]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "third", items[4]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "fourth", items[5]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "sixth", items[6]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "sixth", items[7]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "sixth", items[8]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "sixth", items[9]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "seventh", items[10]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "sixth", items[11]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "sixth", items[12]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "seventh", items[13]);
+            ObjectModelHelpers.AssertItemHasMetadata("m1", "eighth", items[14]);
         }
 
         [Fact]
@@ -2848,6 +2938,25 @@ namespace Microsoft.Build.UnitTests.OM.Definition
 
             items[1].ItemType.ShouldBe("to");
             ObjectModelHelpers.AssertItemHasMetadata(expectedMetadataA, items[1]);
+        }
+
+        [Fact]
+        public void UpdateMetadataWithoutItemReferenceShouldBeCaseInsensitive()
+        {
+            string content = @"
+                              <to Include='a' />
+
+                              <to Update='A' m='m1_contents' />";
+
+            IList<ProjectItem> items = ObjectModelHelpers.GetItemsFromFragment(content, true);
+
+            var expectedMetadataA = new Dictionary<string, string>
+            {
+                {"m", "m1_contents"},
+            };
+
+            items[0].ItemType.ShouldBe("to");
+            ObjectModelHelpers.AssertItemHasMetadata(expectedMetadataA, items[0]);
         }
 
         [Fact]

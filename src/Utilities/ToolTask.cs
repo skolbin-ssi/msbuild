@@ -54,10 +54,8 @@ namespace Microsoft.Build.Utilities
     /// Base class used for tasks that spawn an executable. This class implements the ToolPath property which can be used to
     /// override the default path.
     /// </summary>
-    /// <remarks>
-    /// INTERNAL WARNING: DO NOT USE the Log property in this class! Log points to resources in the task assembly itself, and 
-    /// we want to use resources from Utilities. Use LogPrivate (for private Utilities resources) and LogShared (for shared MSBuild resources)
-    /// </remarks>
+    // INTERNAL WARNING: DO NOT USE the Log property in this class! Log points to resources in the task assembly itself, and 
+    // we want to use resources from Utilities. Use LogPrivate (for private Utilities resources) and LogShared (for shared MSBuild resources)
     public abstract class ToolTask : Task, ICancelableTask
     {
         private static readonly bool s_preserveTempFiles = string.Equals(Environment.GetEnvironmentVariable("MSBUILDPRESERVETOOLTEMPFILES"), "1", StringComparison.Ordinal);
@@ -183,6 +181,14 @@ namespace Microsoft.Build.Utilities
         /// </summary>
         /// <value>Path to tool.</value>
         public string ToolPath { set; get; }
+
+        /// <summary>
+        /// Whether or not to use UTF8 encoding for the cmd file and console window.
+        /// Values: Always, Never, Detect
+        /// If set to Detect, the current code page will be used unless it cannot represent 
+        /// the Command string. In that case, UTF-8 is used.
+        /// </summary>
+        public string UseUtf8Encoding { get; set; } = EncodingUtilities.UseUtf8Detect;
 
         /// <summary>
         /// Array of equals-separated pairs of environment
@@ -951,7 +957,6 @@ namespace Microsoft.Build.Utilities
                         timeout = result;
                     }
                 }
-
                 proc.KillTree(timeout);
             }
         }
@@ -1375,7 +1380,7 @@ namespace Microsoft.Build.Utilities
                         }
                         else
                         {
-                            encoding = EncodingUtilities.BatchFileEncoding(commandLineCommands + _temporaryBatchFile, EncodingUtilities.UseUtf8Detect);
+                            encoding = EncodingUtilities.BatchFileEncoding(commandLineCommands + _temporaryBatchFile, UseUtf8Encoding);
 
                             if (encoding.CodePage != EncodingUtilities.CurrentSystemOemEncoding.CodePage)
                             {

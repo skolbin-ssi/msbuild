@@ -464,9 +464,15 @@ namespace Microsoft.Build.Execution
         {
             ErrorUtilities.VerifyThrowArgumentNull(target, nameof(target));
             ErrorUtilities.VerifyThrowArgumentNull(result, nameof(result));
-            if (_resultsByTarget.ContainsKey(target))
+
+            lock (this)
             {
-                ErrorUtilities.VerifyThrow(_resultsByTarget[target].ResultCode == TargetResultCode.Skipped, "Items already exist for target {0}.", target);
+                _resultsByTarget ??= CreateTargetResultDictionary(1);
+            }
+
+            if (_resultsByTarget.TryGetValue(target, out TargetResult targetResult))
+            {
+                ErrorUtilities.VerifyThrow(targetResult.ResultCode == TargetResultCode.Skipped, "Items already exist for target {0}.", target);
             }
 
             _resultsByTarget[target] = result;

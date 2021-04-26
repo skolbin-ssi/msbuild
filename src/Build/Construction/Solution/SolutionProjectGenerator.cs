@@ -28,6 +28,8 @@ using FrameworkName = System.Runtime.Versioning.FrameworkName;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Utilities;
 
+using Microsoft.NET.StringTools;
+
 namespace Microsoft.Build.Construction
 {
     /// <summary>
@@ -780,7 +782,7 @@ namespace Microsoft.Build.Construction
                 AddTraversalTargetForProject(traversalInstance, project, projectConfiguration, "Publish", null, canBuildDirectly);
 
                 // Add any other targets specified by the user that were not already added
-                foreach (string targetName in _targetNames.Where(i => !traversalInstance.Targets.ContainsKey(i)))
+                foreach (string targetName in _targetNames.Except(traversalInstance.Targets.Keys, StringComparer.OrdinalIgnoreCase))
                 {
                     AddTraversalTargetForProject(traversalInstance, project, projectConfiguration, targetName, null, canBuildDirectly);
                 }
@@ -794,7 +796,7 @@ namespace Microsoft.Build.Construction
             }
 
             // Add any other targets specified by the user that were not already added
-            foreach (string targetName in _targetNames.Where(i => !traversalInstance.Targets.ContainsKey(i)))
+            foreach (string targetName in _targetNames.Except(traversalInstance.Targets.Keys, StringComparer.OrdinalIgnoreCase))
             {
                 AddTraversalReferencesTarget(traversalInstance, targetName, null);
             }
@@ -1097,7 +1099,7 @@ namespace Microsoft.Build.Construction
         /// </summary>
         private static string GetPropertiesAttributeForDirectMSBuildTask(ProjectConfigurationInSolution projectConfiguration)
         {
-            string directProjectProperties = OpportunisticIntern.InternStringIfPossible(String.Join(";", GetConfigurationAndPlatformPropertiesString(projectConfiguration), SolutionProperties));
+            string directProjectProperties = Strings.WeakIntern(String.Join(";", GetConfigurationAndPlatformPropertiesString(projectConfiguration), SolutionProperties));
             return directProjectProperties;
         }
 
@@ -1199,7 +1201,7 @@ namespace Microsoft.Build.Construction
                 AddMetaprojectTargetForWebProject(traversalProject, metaprojectInstance, project, "Rebuild");
                 AddMetaprojectTargetForWebProject(traversalProject, metaprojectInstance, project, "Publish");
 
-                foreach (string targetName in _targetNames.Where(i => !metaprojectInstance.Targets.ContainsKey(i)))
+                foreach (string targetName in _targetNames.Except(metaprojectInstance.Targets.Keys, StringComparer.OrdinalIgnoreCase))
                 {
                     AddMetaprojectTargetForWebProject(traversalProject, metaprojectInstance, project, targetName);
                 }
@@ -1219,7 +1221,7 @@ namespace Microsoft.Build.Construction
                 AddMetaprojectTargetForManagedProject(traversalProject, metaprojectInstance, project, projectConfiguration, "Rebuild", targetOutputItemName);
                 AddMetaprojectTargetForManagedProject(traversalProject, metaprojectInstance, project, projectConfiguration, "Publish", null);
 
-                foreach (string targetName in _targetNames.Where(i => !metaprojectInstance.Targets.ContainsKey(i)))
+                foreach (string targetName in _targetNames.Except(metaprojectInstance.Targets.Keys, StringComparer.OrdinalIgnoreCase))
                 {
                     AddMetaprojectTargetForManagedProject(traversalProject, metaprojectInstance, project, projectConfiguration, targetName, null);
                 }
@@ -1231,7 +1233,7 @@ namespace Microsoft.Build.Construction
                 AddMetaprojectTargetForUnknownProjectType(traversalProject, metaprojectInstance, project, "Rebuild", unknownProjectTypeErrorMessage);
                 AddMetaprojectTargetForUnknownProjectType(traversalProject, metaprojectInstance, project, "Publish", unknownProjectTypeErrorMessage);
 
-                foreach (string targetName in _targetNames.Where(i => !metaprojectInstance.Targets.ContainsKey(i)))
+                foreach (string targetName in _targetNames.Except(metaprojectInstance.Targets.Keys, StringComparer.OrdinalIgnoreCase))
                 {
                     AddMetaprojectTargetForUnknownProjectType(traversalProject, metaprojectInstance, project, targetName, unknownProjectTypeErrorMessage);
                 }
@@ -1343,7 +1345,7 @@ namespace Microsoft.Build.Construction
         /// </summary>
         private void AddMetaprojectBuildTask(ProjectInSolution project, ProjectTargetInstance target, string targetToBuild, string outputItem)
         {
-            ProjectTaskInstance task = target.AddTask("MSBuild", OpportunisticIntern.InternStringIfPossible("'%(ProjectReference.Identity)' == '" + GetMetaprojectName(project) + "'"), String.Empty);
+            ProjectTaskInstance task = target.AddTask("MSBuild", Strings.WeakIntern("'%(ProjectReference.Identity)' == '" + GetMetaprojectName(project) + "'"), String.Empty);
             task.SetParameter("Projects", "@(ProjectReference)");
 
             if (targetToBuild != null)

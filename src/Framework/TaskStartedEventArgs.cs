@@ -10,14 +10,12 @@ namespace Microsoft.Build.Framework
     /// <summary>
     /// Arguments for task started events
     /// </summary>
-    /// <remarks>
-    /// WARNING: marking a type [Serializable] without implementing
-    /// ISerializable imposes a serialization contract -- it is a
-    /// promise to never change the type's fields i.e. the type is
-    /// immutable; adding new fields in the next version of the type
-    /// without following certain special FX guidelines, can break both
-    /// forward and backward compatibility
-    /// </remarks>
+    // WARNING: marking a type [Serializable] without implementing
+    // ISerializable imposes a serialization contract -- it is a
+    // promise to never change the type's fields i.e. the type is
+    // immutable; adding new fields in the next version of the type
+    // without following certain special FX guidelines, can break both
+    // forward and backward compatibility
     [Serializable]
     public class TaskStartedEventArgs : BuildStatusEventArgs
     {
@@ -124,5 +122,24 @@ namespace Microsoft.Build.Framework
         /// MSBuild file where this task was defined.   
         /// </summary>
         public string TaskFile => taskFile;
+
+        public override string Message
+        {
+            get
+            {
+                if (RawMessage == null)
+                {
+                    lock (locker)
+                    {
+                        if (RawMessage == null)
+                        {
+                            RawMessage = FormatResourceStringIgnoreCodeAndKeyword("TaskStarted", TaskName);
+                        }
+                    }
+                }
+
+                return RawMessage;
+            }
+        }
     }
 }
