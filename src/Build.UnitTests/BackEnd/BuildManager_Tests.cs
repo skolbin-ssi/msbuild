@@ -703,6 +703,11 @@ namespace Microsoft.Build.UnitTests.BackEnd
             _env.SetEnvironmentVariable("MsBuildForwardPropertiesFromChild", "InitialProperty3;IAMNOTREAL");
             _env.SetEnvironmentVariable("MSBUILDNOINPROCNODE", "1");
 
+            // ProjectEvaluationFinished automatically and always forwards all properties, so we'd
+            // end up with all ~136 properties. Since this test is explicitly testing forwarding specific
+            // properties on ProjectStarted, turn off the new behavior.
+            _env.SetEnvironmentVariable("MSBUILDLOGPROPERTIESANDITEMSAFTEREVALUATION", "0");
+
             var project = CreateProject(contents, null, _projectCollection, false);
             var data = new BuildRequestData(project.FullPath, new Dictionary<string, string>(),
                 MSBuildDefaultToolsVersion, new string[] { }, null);
@@ -3954,7 +3959,7 @@ namespace Microsoft.Build.UnitTests.BackEnd
         /// Regression test for https://github.com/Microsoft/msbuild/issues/3047
         /// </summary>
         [Fact]
-        [SkipOnTargetFramework(TargetFrameworkMonikers.Mono, "out-of-proc nodes not working on mono yet")]
+        [SkipOnMono("out-of-proc nodes not working on mono yet")]
         public void MultiProcReentrantProjectWithCallTargetDoesNotFail()
         {
             var a =
