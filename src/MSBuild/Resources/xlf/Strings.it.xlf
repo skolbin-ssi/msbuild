@@ -315,7 +315,7 @@ Copyright (C) Microsoft Corporation. Tutti i diritti sono riservati.
         <target state="translated">  @&lt;file&gt;            Inserisce le impostazioni della riga di comando da un file di testo. Per specificare
                      più file di risposta, specificare ciascun file
                      separatamente.
-                     
+
                      Qualsiasi file di risposta denominato "msbuild.rsp" viene usato
                      automaticamente dai percorsi seguenti: 
                      (1) la directory di msbuild.exe
@@ -815,6 +815,7 @@ Copyright (C) Microsoft Corporation. Tutti i diritti sono riservati.
                      file viene assegnato il nome "MSBuild&lt;idnodo&gt;.log". Il
                      percorso dei file e altri parametri di fileLogger possono
                      essere specificati aggiungendo l'opzione
+
                      "-fileLoggerParameters".
                      Se il nome di un file di log viene impostato con l'opzione
                      fileLoggerParameters, il logger distribuito userà il nome
@@ -1343,8 +1344,8 @@ Copyright (C) Microsoft Corporation. Tutti i diritti sono riservati.
     LOCALIZATION: The prefix "MSBUILD : error MSBxxxx:" should not be localized.</note>
       </trans-unit>
       <trans-unit id="UnsupportedOS">
-        <source>MSBUILD : error MSB1015: MSBuild does not run on this version of the operating system. It is only supported on Windows 2000, Windows XP, and later versions.</source>
-        <target state="translated">MSBUILD : error MSB1015: MSBuild non può essere eseguito su questa versione del sistema operativo. È supportato solo in Windows 2000, Windows XP e versioni successive.</target>
+        <source>MSBUILD : error MSB1015: MSBuild does not run on this version of the operating system. It is only supported on Windows 7 and later versions.</source>
+        <target state="translated">MSBUILD : error MSB1015: MSBuild non può essere eseguito su questa versione del sistema operativo. È supportato solo in Windows 7 e versioni successive.</target>
         <note>{StrBegin="MSBUILD : error MSB1015: "}LOCALIZATION: The error prefix "MSBUILD : error MSBxxxx:" should not be localized.</note>
       </trans-unit>
       <trans-unit id="Using35Engine">
@@ -1685,7 +1686,8 @@ Copyright (C) Microsoft Corporation. Tutti i diritti sono riservati.
                      file is '.md', the result is generated in markdown
                      format. Otherwise, a tab separated file is produced.
     </source>
-        <target state="translated">  -profileEvaluation:&lt;file&gt;                     Esegue la profilatura della valutazione di MSBuild e scrive
+        <target state="translated">  -profileEvaluation:&lt;file&gt;
+Esegue la profilatura della valutazione di MSBuild e scrive
                      il risultato nel file specificato. Se l'estensione del file
                      specificato è '.md', il risultato viene generato in formato
                      Markdown. In caso contrario, viene prodotto un file

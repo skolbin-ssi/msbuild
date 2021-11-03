@@ -505,7 +505,7 @@ Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
                             bei der Mehrprozessorprotokollierung im Modus mit nur einem Prozessor.
                         EnableMPLogging: Aktiviert das Format der
                             Mehrprozessorprotokollierung auch bei der Ausführung
-                            im Modus mit nur einem Prozessor. Dieses Protokollierungsformat ist standardmäßig aktiviert.  
+                            im Modus mit nur einem Prozessor. Dieses Protokollierungsformat ist standardmäßig aktiviert. 
                         ForceConsoleColor: Verwendet selbst dann
                             ANSI-Konsolenfarben, wenn
                             die Konsole dies nicht unterstützt.
@@ -1322,8 +1322,8 @@ Copyright (C) Microsoft Corporation. Alle Rechte vorbehalten.
     LOCALIZATION: The prefix "MSBUILD : error MSBxxxx:" should not be localized.</note>
       </trans-unit>
       <trans-unit id="UnsupportedOS">
-        <source>MSBUILD : error MSB1015: MSBuild does not run on this version of the operating system. It is only supported on Windows 2000, Windows XP, and later versions.</source>
-        <target state="translated">MSBUILD : error MSB1015: MSBuild kann unter dieser Version des Betriebssystems nicht ausgeführt werden. Nur Windows 2000, Windows XP und Folgeversionen werden unterstützt.</target>
+        <source>MSBUILD : error MSB1015: MSBuild does not run on this version of the operating system. It is only supported on Windows 7 and later versions.</source>
+        <target state="translated">MSBUILD : error MSB1015: MSBuild kann unter dieser Version des Betriebssystems nicht ausgeführt werden. Nur Windows 7 und Folgeversionen werden unterstützt.</target>
         <note>{StrBegin="MSBUILD : error MSB1015: "}LOCALIZATION: The error prefix "MSBUILD : error MSBxxxx:" should not be localized.</note>
       </trans-unit>
       <trans-unit id="Using35Engine">

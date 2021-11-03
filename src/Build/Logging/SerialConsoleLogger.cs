@@ -497,28 +497,8 @@ namespace Microsoft.Build.BackEnd.Logging
         /// </summary>
         public override void MessageHandler(object sender, BuildMessageEventArgs e)
         {
-            bool print = false;
-            bool lightenText = false;
-            switch (e.Importance)
-            {
-                case MessageImportance.High:
-                    print = IsVerbosityAtLeast(LoggerVerbosity.Minimal);
-                    break;
-
-                case MessageImportance.Normal:
-                    print = IsVerbosityAtLeast(LoggerVerbosity.Normal);
-                    lightenText = true;
-                    break;
-
-                case MessageImportance.Low:
-                    print = IsVerbosityAtLeast(LoggerVerbosity.Detailed);
-                    lightenText = true;
-                    break;
-
-                default:
-                    ErrorUtilities.VerifyThrow(false, "Impossible");
-                    break;
-            }
+            LoggerVerbosity minimumVerbosity = ImportanceToMinimumVerbosity(e.Importance, out bool lightenText);
+            bool print = IsVerbosityAtLeast(minimumVerbosity);
 
             if (print)
             {
@@ -722,7 +702,7 @@ namespace Microsoft.Build.BackEnd.Logging
             }
             else
             {
-                ErrorUtilities.VerifyThrow(false, "Unexpected frame type.");
+                ErrorUtilities.ThrowInternalError("Unexpected frame type.");
                 return null;
             }
         }
@@ -772,7 +752,7 @@ namespace Microsoft.Build.BackEnd.Logging
                         break;
 
                     default:
-                        ErrorUtilities.VerifyThrow(false, "Unexpected frame type.");
+                        ErrorUtilities.ThrowInternalError("Unexpected frame type.");
                         break;
                 }
             }

@@ -33,7 +33,7 @@ namespace Microsoft.Build.CommandLine
 #if CLR2COMPATIBILITY
         IBuildEngine3
 #else
-        IBuildEngine9
+        IBuildEngine10
 #endif
     {
         /// <summary>
@@ -189,6 +189,10 @@ namespace Microsoft.Build.CommandLine
             thisINodePacketFactory.RegisterPacketHandler(NodePacketType.TaskHostConfiguration, TaskHostConfiguration.FactoryForDeserialization, this);
             thisINodePacketFactory.RegisterPacketHandler(NodePacketType.TaskHostTaskCancelled, TaskHostTaskCancelled.FactoryForDeserialization, this);
             thisINodePacketFactory.RegisterPacketHandler(NodePacketType.NodeBuildComplete, NodeBuildComplete.FactoryForDeserialization, this);
+
+#if !CLR2COMPATIBILITY
+            EngineServices = new EngineServicesImpl(this);
+#endif
         }
 
         #region IBuildEngine Implementation (Properties)
@@ -492,6 +496,39 @@ namespace Microsoft.Build.CommandLine
         }
 
         #endregion
+
+        #region IBuildEngine10 Members
+
+        [Serializable]
+        private sealed class EngineServicesImpl : EngineServices
+        {
+            private readonly OutOfProcTaskHostNode _taskHost;
+
+            internal EngineServicesImpl(OutOfProcTaskHostNode taskHost)
+            {
+                _taskHost = taskHost;
+            }
+
+            /// <summary>
+            /// No logging verbosity optimization in OOP nodes.
+            /// </summary>
+            public override bool LogsMessagesOfImportance(MessageImportance importance) => true;
+
+            /// <inheritdoc />
+            public override bool IsTaskInputLoggingEnabled
+            {
+                get
+                {
+                    ErrorUtilities.VerifyThrow(_taskHost._currentConfiguration != null, "We should never have a null configuration during a BuildEngine callback!");
+                    return _taskHost._currentConfiguration.IsTaskInputLoggingEnabled;
+                }
+            }
+        }
+
+        public EngineServices EngineServices { get; }
+
+        #endregion
+
 #endif
 
         #region INodePacketFactory Members

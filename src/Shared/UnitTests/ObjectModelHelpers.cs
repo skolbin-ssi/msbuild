@@ -155,6 +155,40 @@ namespace Microsoft.Build.UnitTests
             }
         }
 
+        internal static void ShouldHaveSucceeded(this BuildResult result)
+        {
+            result.OverallResult.ShouldBe(
+                BuildResultCode.Success,
+                customMessage: result.Exception is not null ? result.Exception.ToString() : string.Empty);
+        }
+
+        internal static void ShouldHaveSucceeded(this GraphBuildResult result)
+        {
+            result.OverallResult.ShouldBe(
+                BuildResultCode.Success,
+                customMessage: result.Exception is not null ? result.Exception.ToString() : string.Empty);
+        }
+
+        internal static void ShouldHaveFailed(this BuildResult result, string exceptionMessageSubstring = null)
+        {
+            result.OverallResult.ShouldBe(BuildResultCode.Failure);
+
+            if (exceptionMessageSubstring != null)
+            {
+                result.Exception.Message.ShouldContain(exceptionMessageSubstring);
+            }
+        }
+
+        internal static void ShouldHaveFailed(this GraphBuildResult result, string exceptionMessageSubstring = null)
+        {
+            result.OverallResult.ShouldBe(BuildResultCode.Failure);
+
+            if (exceptionMessageSubstring != null)
+            {
+                result.Exception.Message.ShouldContain(exceptionMessageSubstring);
+            }
+        }
+
         internal static string NormalizeSlashes(string path)
         {
             return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
@@ -1982,6 +2016,65 @@ namespace Microsoft.Build.UnitTests
 
                 _buildManager.EndBuild();
                 _buildManager.Dispose();
+            }
+        }
+
+        internal sealed class LoggingDirectoryCacheFactory : IDirectoryCacheFactory
+        {
+            public List<LoggingDirectoryCache> DirectoryCaches { get; } = new();
+
+            public IDirectoryCache GetDirectoryCacheForEvaluation(int evaluationId)
+            {
+                var directoryCache = new LoggingDirectoryCache(evaluationId);
+                DirectoryCaches.Add(directoryCache);
+                return directoryCache;
+            }
+        }
+
+        internal sealed class LoggingDirectoryCache : IDirectoryCache
+        {
+            internal int EvaluationId { get; }
+
+            public ConcurrentDictionary<string, int> ExistenceChecks { get; } = new();
+            public ConcurrentDictionary<string, int> Enumerations { get; } = new();
+
+            public LoggingDirectoryCache(int evaluationId)
+            {
+                EvaluationId = evaluationId;
+            }
+
+            public bool DirectoryExists(string path)
+            {
+                IncrementExistenceChecks(path);
+                return Directory.Exists(path);
+            }
+
+            public bool FileExists(string path)
+            {
+                IncrementExistenceChecks(path);
+                return File.Exists(path);
+            }
+
+            public IEnumerable<TResult> EnumerateDirectories<TResult>(string path, string pattern, FindPredicate predicate, FindTransform<TResult> transform)
+            {
+                IncrementEnumerations(path);
+                return Enumerable.Empty<TResult>();
+            }
+
+            public IEnumerable<TResult> EnumerateFiles<TResult>(string path, string pattern, FindPredicate predicate, FindTransform<TResult> transform)
+            {
+                IncrementEnumerations(path);
+                return Enumerable.Empty<TResult>();
+            }
+
+            private void IncrementExistenceChecks(string path)
+            {
+                ExistenceChecks.AddOrUpdate(path, p => 1, (p, c) => c + 1);
+            }
+
+            private void IncrementEnumerations(string path)
+            {
+                Enumerations.AddOrUpdate(path, p => 1, (p, c) => c + 1);
             }
         }
 

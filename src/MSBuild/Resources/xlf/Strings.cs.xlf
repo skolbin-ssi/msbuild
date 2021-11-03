@@ -494,10 +494,10 @@ Copyright (C) Microsoft Corporation. Všechna práva vyhrazena.
                         ErrorsOnly – zobrazí jenom chyby.
                         WarningsOnly – zobrazí jenom upozornění.
                         NoItemAndPropertyList – nezobrazí na začátku sestavení každého
-                            projektu seznamy položek a vlastností.    
-                        ShowCommandLine – zobrazí zprávy TaskCommandLineEvent.  
+                            projektu seznamy položek a vlastností.
+                        ShowCommandLine – zobrazí zprávy TaskCommandLineEvent.
                         ShowTimestamp – před každou zprávou zobrazí
-                            časové razítko.                                           
+                            časové razítko.
                         ShowEventId – zobrazí ID události pro spuštěné a dokončené
                             události a zprávy.
                         ForceNoAlign – nenastavuje text podle velikosti vyrovnávací
@@ -634,7 +634,7 @@ Copyright (C) Microsoft Corporation. Všechna práva vyhrazena.
                      Setting this also turns on isolated builds (-isolate).
                      (short form: -orc)
    </source>
-        <target state="translated">  -outputResultsCache:&lt;souborMezipaměti&gt;...
+        <target state="translated">  -outputResultsCache:[souborMezipaměti]...
                      Výstupní soubor mezipaměti, do něhož bude MSBuild
                      zapisovat obsah svých mezipamětí výsledků sestavení.
                      Nastavením této možnosti zapnete také izolované buildy (-isolate).
@@ -794,7 +794,7 @@ Copyright (C) Microsoft Corporation. Všechna práva vyhrazena.
                      template and append the node id to this fileName to
                      create a log file for each node.
     </source>
-        <target state="translated">  -distributedFileLogger                                                       
+        <target state="translated">  -distributedFileLogger
                      Uloží výstup sestavení do více souborů protokolu, po jednom
                      pro každý uzel nástroje MSBuild. Tyto soubory jsou na počátku
                      umístěny v aktuálním adresáři. Standardně mají tyto soubory
@@ -1330,8 +1330,8 @@ Copyright (C) Microsoft Corporation. Všechna práva vyhrazena.
     LOCALIZATION: The prefix "MSBUILD : error MSBxxxx:" should not be localized.</note>
       </trans-unit>
       <trans-unit id="UnsupportedOS">
-        <source>MSBUILD : error MSB1015: MSBuild does not run on this version of the operating system. It is only supported on Windows 2000, Windows XP, and later versions.</source>
-        <target state="translated">MSBUILD : error MSB1015: MSBuild nejde spustit v této verzi operačního systému. Podporuje se jenom v systémech Windows 2000, Windows XP a novějších verzích.</target>
+        <source>MSBUILD : error MSB1015: MSBuild does not run on this version of the operating system. It is only supported on Windows 7 and later versions.</source>
+        <target state="translated">MSBUILD : error MSB1015: MSBuild nejde spustit v této verzi operačního systému. Podporuje se jenom v systémech Windows 7 a novějších verzích.</target>
         <note>{StrBegin="MSBUILD : error MSB1015: "}LOCALIZATION: The error prefix "MSBUILD : error MSBxxxx:" should not be localized.</note>
       </trans-unit>
       <trans-unit id="Using35Engine">

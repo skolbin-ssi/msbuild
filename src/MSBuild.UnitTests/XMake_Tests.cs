@@ -19,6 +19,7 @@ using Xunit.Abstractions;
 using Shouldly;
 using System.IO.Compression;
 using System.Reflection;
+using Microsoft.Build.Utilities;
 
 namespace Microsoft.Build.UnitTests
 {
@@ -54,6 +55,23 @@ namespace Microsoft.Build.UnitTests
             string[] parameters = switches[CommandLineSwitches.ParameterizedSwitch.Property];
             parameters[0].ShouldBe("a=b");
             parameters[1].ShouldBe("c=d");
+        }
+
+        [Fact]
+        public void GatherCommandLineSwitchesAnyDash()
+        {
+            var switches = new CommandLineSwitches();
+
+            var arguments = new List<string> {
+                "-p:a=b",
+                "--p:maxcpucount=8"
+            };
+
+            MSBuildApp.GatherCommandLineSwitches(arguments, switches);
+
+            string[] parameters = switches[CommandLineSwitches.ParameterizedSwitch.Property];
+            parameters[0].ShouldBe("a=b");
+            parameters[1].ShouldBe("maxcpucount=8");
         }
 
         [Fact]
@@ -391,46 +409,85 @@ namespace Microsoft.Build.UnitTests
         {
             string commandLineArg = "\"/p:foo=\"bar";
             string unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out var doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":\"foo=\"bar");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":\"foo=\"bar");
             doubleQuotesRemovedFromArg.ShouldBe(2);
 
             commandLineArg = "\"/p:foo=bar\"";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":foo=bar");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":foo=bar");
             doubleQuotesRemovedFromArg.ShouldBe(2);
 
             commandLineArg = "/p:foo=bar";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":foo=bar");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":foo=bar");
             doubleQuotesRemovedFromArg.ShouldBe(0);
 
             commandLineArg = "\"\"/p:foo=bar\"";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":foo=bar\"");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":foo=bar\"");
             doubleQuotesRemovedFromArg.ShouldBe(3);
 
             // this test is totally unreal -- we'd never attempt to extract switch parameters if the leading character is not a
             // switch indicator (either '-' or '/') -- here the leading character is a double-quote
             commandLineArg = "\"\"\"/p:foo=bar\"";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "/p", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":foo=bar\"");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "/p", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":foo=bar\"");
             doubleQuotesRemovedFromArg.ShouldBe(3);
 
             commandLineArg = "\"/pr\"operty\":foo=bar";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "property", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":foo=bar");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "property", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":foo=bar");
             doubleQuotesRemovedFromArg.ShouldBe(3);
 
             commandLineArg = "\"/pr\"op\"\"erty\":foo=bar\"";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "property", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":foo=bar");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "property", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":foo=bar");
             doubleQuotesRemovedFromArg.ShouldBe(6);
 
             commandLineArg = "/p:\"foo foo\"=\"bar bar\";\"baz=onga\"";
             unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
-            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':')).ShouldBe(":\"foo foo\"=\"bar bar\";\"baz=onga\"");
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 1).ShouldBe(":\"foo foo\"=\"bar bar\";\"baz=onga\"");
             doubleQuotesRemovedFromArg.ShouldBe(6);
         }
+        
+        [Fact]
+        public void ExtractSwitchParametersTestDoubleDash()
+        {
+            var commandLineArg = "\"--p:foo=\"bar";
+            var unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out var doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":\"foo=\"bar");
+            doubleQuotesRemovedFromArg.ShouldBe(2);
+
+            commandLineArg = "\"--p:foo=bar\"";
+            unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":foo=bar");
+            doubleQuotesRemovedFromArg.ShouldBe(2);
+
+            commandLineArg = "--p:foo=bar";
+            unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":foo=bar");
+            doubleQuotesRemovedFromArg.ShouldBe(0);
+
+            commandLineArg = "\"\"--p:foo=bar\"";
+            unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":foo=bar\"");
+            doubleQuotesRemovedFromArg.ShouldBe(3);
+
+            commandLineArg = "\"--pr\"operty\":foo=bar";
+            unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "property", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":foo=bar");
+            doubleQuotesRemovedFromArg.ShouldBe(3);
+
+            commandLineArg = "\"--pr\"op\"\"erty\":foo=bar\"";
+            unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "property", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":foo=bar");
+            doubleQuotesRemovedFromArg.ShouldBe(6);
+
+            commandLineArg = "--p:\"foo foo\"=\"bar bar\";\"baz=onga\"";
+            unquotedCommandLineArg = QuotingUtilities.Unquote(commandLineArg, out doubleQuotesRemovedFromArg);
+            MSBuildApp.ExtractSwitchParameters(commandLineArg, unquotedCommandLineArg, doubleQuotesRemovedFromArg, "p", unquotedCommandLineArg.IndexOf(':'), 2).ShouldBe(":\"foo foo\"=\"bar bar\";\"baz=onga\"");
+            doubleQuotesRemovedFromArg.ShouldBe(6);
+        }        
 
         [Fact]
         public void GetLengthOfSwitchIndicatorTest()
@@ -2272,6 +2329,67 @@ EndGlobal
 
             success.ShouldBeTrue(output);
             output.ShouldContain(testMessage);
+        }
+
+        /// <summary>
+        /// Helper task used by <see cref="EndToEndMinimumMessageImportance"/> to verify <see cref="TaskLoggingHelper.LogsMessagesOfImportance"/>.
+        /// </summary>
+        public class MessageImportanceCheckingTask : Task
+        {
+            public int ExpectedMinimumMessageImportance { get; set; }
+
+            public override bool Execute()
+            {
+                bool shouldLogHigh = Log.LogsMessagesOfImportance(MessageImportance.High);
+                bool shouldLogNormal = Log.LogsMessagesOfImportance(MessageImportance.Normal);
+                bool shouldLogLow = Log.LogsMessagesOfImportance(MessageImportance.Low);
+                return (MessageImportance)ExpectedMinimumMessageImportance switch
+                {
+                    MessageImportance.High - 1 => !shouldLogHigh && !shouldLogNormal && !shouldLogLow,
+                    MessageImportance.High => shouldLogHigh && !shouldLogNormal && !shouldLogLow,
+                    MessageImportance.Normal => shouldLogHigh && shouldLogNormal && !shouldLogLow,
+                    MessageImportance.Low => shouldLogHigh && shouldLogNormal && shouldLogLow,
+                    _ => false
+                };
+            }
+        }
+
+        [Theory]
+        [InlineData("/v:diagnostic", MessageImportance.Low)]
+        [InlineData("/v:detailed", MessageImportance.Low)]
+        [InlineData("/v:normal", MessageImportance.Normal)]
+        [InlineData("/v:minimal", MessageImportance.High)]
+        [InlineData("/v:quiet", MessageImportance.High - 1)]
+        [InlineData("/v:diagnostic /bl", MessageImportance.Low)]
+        [InlineData("/v:detailed /bl", MessageImportance.Low)]
+        [InlineData("/v:normal /bl", MessageImportance.Low)] // v:normal but with binary logger so everything must be logged
+        [InlineData("/v:minimal /bl", MessageImportance.Low)] // v:minimal but with binary logger so everything must be logged
+        [InlineData("/v:quiet /bl", MessageImportance.Low)] // v:quiet but with binary logger so everything must be logged
+        public void EndToEndMinimumMessageImportance(string arguments, MessageImportance expectedMinimumMessageImportance)
+        {
+            using TestEnvironment testEnvironment = UnitTests.TestEnvironment.Create();
+
+            string projectContents = ObjectModelHelpers.CleanupFileContents(@"<Project>
+
+  <UsingTask TaskName=""" + typeof(MessageImportanceCheckingTask).FullName + @""" AssemblyFile=""" + Assembly.GetExecutingAssembly().Location + @"""/>
+
+  <Target Name=""CheckMessageImportance"">
+    <MessageImportanceCheckingTask ExpectedMinimumMessageImportance=""" + (int)expectedMinimumMessageImportance + @""" />
+  </Target>
+
+</Project>");
+
+            TransientTestProjectWithFiles testProject = testEnvironment.CreateTestProjectWithFiles(projectContents);
+
+            // Build in-proc.
+            RunnerUtilities.ExecMSBuild($"{arguments} \"{testProject.ProjectFile}\"", out bool success, _output);
+            success.ShouldBeTrue();
+
+            // Build out-of-proc to exercise both logging code paths.
+            testEnvironment.SetEnvironmentVariable("MSBUILDNOINPROCNODE", "1");
+            testEnvironment.SetEnvironmentVariable("MSBUILDDISABLENODEREUSE", "1");
+            RunnerUtilities.ExecMSBuild($"{arguments} \"{testProject.ProjectFile}\"", out success, _output);
+            success.ShouldBeTrue();
         }
 
 #if FEATURE_ASSEMBLYLOADCONTEXT

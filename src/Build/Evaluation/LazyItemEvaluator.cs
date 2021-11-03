@@ -6,7 +6,6 @@ using Microsoft.Build.Collections;
 using Microsoft.Build.Construction;
 using Microsoft.Build.Evaluation.Context;
 using Microsoft.Build.Eventing;
-using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Shared.FileSystem;
 using Microsoft.Build.Utilities;
@@ -16,6 +15,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 
 namespace Microsoft.Build.Evaluation
 {
@@ -39,22 +39,22 @@ namespace Microsoft.Build.Evaluation
             new Dictionary<string, LazyItemList>() :
             new Dictionary<string, LazyItemList>(StringComparer.OrdinalIgnoreCase);
 
-        protected IFileSystem FileSystem { get; }
+        protected EvaluationContext EvaluationContext { get; }
 
-        protected EngineFileUtilities EngineFileUtilities { get; }
+        protected IFileSystem FileSystem => EvaluationContext.FileSystem;
+        protected FileMatcher FileMatcher => EvaluationContext.FileMatcher;
 
         public LazyItemEvaluator(IEvaluatorData<P, I, M, D> data, IItemFactory<I, I> itemFactory, LoggingContext loggingContext, EvaluationProfiler evaluationProfiler, EvaluationContext evaluationContext)
         {
             _outerEvaluatorData = data;
-            _outerExpander = new Expander<P, I>(_outerEvaluatorData, _outerEvaluatorData, evaluationContext.FileSystem);
+            _outerExpander = new Expander<P, I>(_outerEvaluatorData, _outerEvaluatorData, evaluationContext);
             _evaluatorData = new EvaluatorData(_outerEvaluatorData, itemType => GetItems(itemType));
-            _expander = new Expander<P, I>(_evaluatorData, _evaluatorData, evaluationContext.FileSystem);
+            _expander = new Expander<P, I>(_evaluatorData, _evaluatorData, evaluationContext);
             _itemFactory = itemFactory;
             _loggingContext = loggingContext;
             _evaluationProfiler = evaluationProfiler;
 
-            FileSystem = evaluationContext.FileSystem;
-            EngineFileUtilities = evaluationContext.EngineFileUtilities;
+            EvaluationContext = evaluationContext;
         }
 
         private ImmutableList<I> GetItems(string itemType)
@@ -124,12 +124,13 @@ namespace Microsoft.Build.Evaluation
 
         public struct ItemData
         {
-            public ItemData(I item, ProjectItemElement originatingItemElement, int elementOrder, bool conditionResult)
+            public ItemData(I item, ProjectItemElement originatingItemElement, int elementOrder, bool conditionResult, string normalizedItemValue = null)
             {
                 Item = item;
                 OriginatingItemElement = originatingItemElement;
                 ElementOrder = elementOrder;
                 ConditionResult = conditionResult;
+                _normalizedItemValue = normalizedItemValue;
             }
 
             public ItemData Clone(IItemFactory<I, I> itemFactory, ProjectItemElement initialItemElementForFactory)
@@ -140,19 +141,37 @@ namespace Microsoft.Build.Evaluation
                 var clonedItem = itemFactory.CreateItem(Item, OriginatingItemElement.ContainingProject.FullPath);
                 itemFactory.ItemElement = initialItemElementForFactory;
 
-                return new ItemData(clonedItem, OriginatingItemElement, ElementOrder, ConditionResult);
+                return new ItemData(clonedItem, OriginatingItemElement, ElementOrder, ConditionResult, _normalizedItemValue);
             }
 
             public I Item { get; }
             public ProjectItemElement OriginatingItemElement { get; }
             public int ElementOrder { get; }
             public bool ConditionResult { get; }
+
+            /// <summary>
+            /// Lazily created normalized item value.
+            /// </summary>
+            private string _normalizedItemValue;
+            public string NormalizedItemValue
+            {
+                get
+                {
+                    var normalizedItemValue = Volatile.Read(ref _normalizedItemValue);
+                    if (normalizedItemValue == null)
+                    {
+                        normalizedItemValue = FileUtilities.NormalizePathForComparisonNoThrow(Item.EvaluatedInclude, Item.ProjectDirectory);
+                        Volatile.Write(ref _normalizedItemValue, normalizedItemValue);
+                    }
+                    return normalizedItemValue;
+                }
+            }
         }
 
         private class MemoizedOperation : IItemOperation
         {
             public LazyItemOperation Operation { get; }
-            private Dictionary<ISet<string>, ImmutableList<ItemData>> _cache;
+            private Dictionary<ISet<string>, OrderedItemDataCollection> _cache;
 
             private bool _isReferenced;
 #if DEBUG
@@ -164,7 +183,7 @@ namespace Microsoft.Build.Evaluation
                 Operation = operation;
             }
 
-            public void Apply(ImmutableList<ItemData>.Builder listBuilder, ImmutableHashSet<string> globsToIgnore)
+            public void Apply(OrderedItemDataCollection.Builder listBuilder, ImmutableHashSet<string> globsToIgnore)
             {
 #if DEBUG
                 CheckInvariant();
@@ -200,7 +219,7 @@ namespace Microsoft.Build.Evaluation
             }
 #endif
 
-            public bool TryGetFromCache(ISet<string> globsToIgnore, out ImmutableList<ItemData> items)
+            public bool TryGetFromCache(ISet<string> globsToIgnore, out OrderedItemDataCollection items)
             {
                 if (_cache != null)
                 {
@@ -219,11 +238,11 @@ namespace Microsoft.Build.Evaluation
                 _isReferenced = true;
             }
 
-            private void AddItemsToCache(ImmutableHashSet<string> globsToIgnore, ImmutableList<ItemData> items)
+            private void AddItemsToCache(ImmutableHashSet<string> globsToIgnore, OrderedItemDataCollection items)
             {
                 if (_cache == null)
                 {
-                    _cache = new Dictionary<ISet<string>, ImmutableList<ItemData>>();
+                    _cache = new Dictionary<ISet<string>, OrderedItemDataCollection>();
                 }
 
                 _cache[globsToIgnore] = items;
@@ -253,7 +272,7 @@ namespace Microsoft.Build.Evaluation
                 return items.ToImmutable();
             }
 
-            public ImmutableList<ItemData>.Builder GetItemData(ImmutableHashSet<string> globsToIgnore)
+            public OrderedItemDataCollection.Builder GetItemData(ImmutableHashSet<string> globsToIgnore)
             {
                 // Cache results only on the LazyItemOperations whose results are required by an external caller (via GetItems). This means:
                 //   - Callers of GetItems who have announced ahead of time that they would reference an operation (via MarkAsReferenced())
@@ -275,7 +294,7 @@ namespace Microsoft.Build.Evaluation
                 // does not mutate: one can add operations on top, but the base never changes, and (ii) the globsToIgnore passed to the tail is the concatenation between
                 // the globsToIgnore received as an arg, and the globsToIgnore produced by the head (if the head is a Remove operation)
 
-                ImmutableList<ItemData> items;
+                OrderedItemDataCollection items;
                 if (_memoizedOperation.TryGetFromCache(globsToIgnore, out items))
                 {
                     return items.ToBuilder();
@@ -299,12 +318,12 @@ namespace Microsoft.Build.Evaluation
             /// is to optimize the case in which as series of UpdateOperations, each of which affects a single ItemSpec, are applied to all
             /// items in the list, leading to a quadratic-time operation.
             /// </summary>
-            private static ImmutableList<ItemData>.Builder ComputeItems(LazyItemList lazyItemList, ImmutableHashSet<string> globsToIgnore)
+            private static OrderedItemDataCollection.Builder ComputeItems(LazyItemList lazyItemList, ImmutableHashSet<string> globsToIgnore)
             {
                 // Stack of operations up to the first one that's cached (exclusive)
                 Stack<LazyItemList> itemListStack = new Stack<LazyItemList>();
 
-                ImmutableList<ItemData>.Builder items = null;
+                OrderedItemDataCollection.Builder items = null;
 
                 // Keep a separate stack of lists of globs to ignore that only gets modified for Remove operations
                 Stack<ImmutableHashSet<string>> globsToIgnoreStack = null;
@@ -313,7 +332,7 @@ namespace Microsoft.Build.Evaluation
                 {
                     var globsToIgnoreFromFutureOperations = globsToIgnoreStack?.Peek() ?? globsToIgnore;
 
-                    ImmutableList<ItemData> itemsFromCache;
+                    OrderedItemDataCollection itemsFromCache;
                     if (currentList._memoizedOperation.TryGetFromCache(globsToIgnoreFromFutureOperations, out itemsFromCache))
                     {
                         // the base items on top of which to apply the uncached operations are the items of the first operation that is cached
@@ -341,7 +360,7 @@ namespace Microsoft.Build.Evaluation
 
                 if (items == null)
                 {
-                    items = ImmutableList.CreateBuilder<ItemData>();
+                    items = OrderedItemDataCollection.CreateBuilder();
                 }
 
                 ImmutableHashSet<string> currentGlobsToIgnore = globsToIgnoreStack == null ? globsToIgnore : globsToIgnoreStack.Peek();
@@ -419,7 +438,7 @@ namespace Microsoft.Build.Evaluation
                 return items;
             }
 
-            private static void ProcessNonWildCardItemUpdates(Dictionary<string, UpdateOperation> itemsWithNoWildcards, ImmutableList<ItemData>.Builder items)
+            private static void ProcessNonWildCardItemUpdates(Dictionary<string, UpdateOperation> itemsWithNoWildcards, OrderedItemDataCollection.Builder items)
             {
 #if DEBUG
                 ErrorUtilities.VerifyThrow(itemsWithNoWildcards.All(fragment => !MSBuildConstants.CharactersForExpansion.Any(fragment.Key.Contains)), $"{nameof(itemsWithNoWildcards)} should not contain any text fragments with wildcards.");

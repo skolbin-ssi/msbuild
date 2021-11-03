@@ -50,6 +50,11 @@ namespace Microsoft.Build.Construction
 #endif // FEATURE_ASPNET_COMPILER
 
         /// <summary>
+        /// Property set by VS when building projects. It's an XML containing the project configurations for ALL projects in the solution for the currently selected solution configuration.
+        /// </summary>
+        internal const string CurrentSolutionConfigurationContents = nameof(CurrentSolutionConfigurationContents);
+
+        /// <summary>
         /// The set of properties all projects in the solution should be built with
         /// </summary>
         private const string SolutionProperties = "BuildingSolutionFile=true; CurrentSolutionConfigurationContents=$(CurrentSolutionConfigurationContents); SolutionDir=$(SolutionDir); SolutionExt=$(SolutionExt); SolutionFileName=$(SolutionFileName); SolutionName=$(SolutionName); SolutionPath=$(SolutionPath)";
@@ -230,6 +235,7 @@ namespace Microsoft.Build.Construction
             };
             using (XmlWriter xw = XmlWriter.Create(solutionConfigurationContents, settings))
             {
+                // TODO: fix code clone for parsing CurrentSolutionConfiguration xml: https://github.com/dotnet/msbuild/issues/6751
                 xw.WriteStartElement("SolutionConfiguration");
 
                 // add a project configuration entry for each project in the solution
@@ -1127,9 +1133,8 @@ namespace Microsoft.Build.Construction
                 {
                     if (!_solutionFile.ProjectsByGuid.TryGetValue(dependencyProjectGuid, out ProjectInSolution dependencyProject))
                     {
-                        ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                        ProjectFileErrorUtilities.ThrowInvalidProjectFile
                             (
-                            false,
                             "SubCategoryForSolutionParsingErrors",
                             new BuildEventFileInfo(traversalProject.FullPath),
                             "SolutionParseProjectDepNotFoundError",
@@ -1200,9 +1205,8 @@ namespace Microsoft.Build.Construction
             if (project.ProjectType == SolutionProjectType.WebProject)
             {
 #if !FEATURE_ASPNET_COMPILER
-                ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                ProjectFileErrorUtilities.ThrowInvalidProjectFile
                     (
-                    false,
                     "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(_solutionFile.FullPath),
                     "AspNetCompiler.UnsupportedMSBuildVersion",
@@ -1289,9 +1293,8 @@ namespace Microsoft.Build.Construction
             {
                 if (!_solutionFile.ProjectsByGuid.TryGetValue(dependencyProjectGuid, out ProjectInSolution dependencyProject))
                 {
-                    ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                    ProjectFileErrorUtilities.ThrowInvalidProjectFile
                         (
-                        false,
                         "SubCategoryForSolutionParsingErrors",
                         new BuildEventFileInfo(traversalProject.FullPath),
                         "SolutionParseProjectDepNotFoundError",
@@ -1551,9 +1554,8 @@ namespace Microsoft.Build.Construction
             }
             if (!isDotNetFramework)
             {
-                ProjectFileErrorUtilities.VerifyThrowInvalidProjectFile
+                ProjectFileErrorUtilities.ThrowInvalidProjectFile
                     (
-                    false,
                     "SubCategoryForSolutionParsingErrors",
                     new BuildEventFileInfo(_solutionFile.FullPath),
                     "AspNetCompiler.InvalidTargetFrameworkMonikerNotDotNET",

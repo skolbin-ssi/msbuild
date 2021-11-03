@@ -34,7 +34,7 @@ namespace Microsoft.Build.BackEnd
 #if FEATURE_APPDOMAIN
         MarshalByRefObject,
 #endif
-        IBuildEngine9
+        IBuildEngine10
     {
         /// <summary>
         /// True if the "secret" environment variable MSBUILDNOINPROCNODE is set.
@@ -130,6 +130,7 @@ namespace Microsoft.Build.BackEnd
             _disableInprocNode = ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_0)
                 ? s_disableInprocNodeByEnvironmentVariable || host.BuildParameters.DisableInProcNode
                 : s_disableInprocNodeByEnvironmentVariable;
+            EngineServices = new EngineServicesImpl(this);
         }
 
         /// <summary>
@@ -454,8 +455,9 @@ namespace Microsoft.Build.BackEnd
                 {
                     e.BuildEventContext = _taskLoggingContext.BuildEventContext;
                     _taskLoggingContext.LoggingService.LogBuildEvent(e);
-                    _taskLoggingContext.HasLoggedErrors = true;
                 }
+                
+                 _taskLoggingContext.HasLoggedErrors = true;
             }
         }
 
@@ -871,6 +873,42 @@ namespace Microsoft.Build.BackEnd
                 ReleaseCores(coresToRelease);
             }
         }
+
+        #endregion
+
+        #region IBuildEngine10 Members
+
+        [Serializable]
+        private sealed class EngineServicesImpl : EngineServices
+        {
+            private readonly TaskHost _taskHost;
+
+            internal EngineServicesImpl(TaskHost taskHost)
+            {
+                _taskHost = taskHost;
+            }
+
+            /// <inheritdoc/>
+            public override bool LogsMessagesOfImportance(MessageImportance importance)
+            {
+#if FEATURE_APPDOMAIN
+                if (RemotingServices.IsTransparentProxy(_taskHost))
+                {
+                    // If the check would be a cross-domain call, chances are that it wouldn't be worth it.
+                    // Simply disable the optimization in such a case.
+                    return true;
+                }
+#endif
+                MessageImportance minimumImportance = _taskHost._taskLoggingContext?.LoggingService.MinimumRequiredMessageImportance ?? MessageImportance.Low;
+                return importance <= minimumImportance;
+
+            }
+
+            /// <inheritdoc/>
+            public override bool IsTaskInputLoggingEnabled => _taskHost._host.BuildParameters.LogTaskInputs;
+        }
+
+        public EngineServices EngineServices { get; }
 
         #endregion
 

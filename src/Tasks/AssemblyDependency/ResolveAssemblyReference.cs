@@ -1247,7 +1247,8 @@ namespace Microsoft.Build.Tasks
             }
 
 #if FEATURE_WIN32_REGISTRY
-            if (dependencyTable.Resolvers != null)
+            MessageImportance messageImportance = MessageImportance.Low;
+            if (dependencyTable.Resolvers != null && Log.LogsMessagesOfImportance(messageImportance))
             {
                 foreach (Resolver r in dependencyTable.Resolvers)
                 {
@@ -1255,7 +1256,6 @@ namespace Microsoft.Build.Tasks
                     {
                         AssemblyFoldersEx assemblyFoldersEx = ((AssemblyFoldersExResolver)r).AssemblyFoldersExLocations;
 
-                        MessageImportance messageImportance = MessageImportance.Low;
                         if (assemblyFoldersEx != null && _showAssemblyFoldersExLocations.TryGetValue(r.SearchPath, out messageImportance))
                         {
                             Log.LogMessageFromResources(messageImportance, "ResolveAssemblyReference.AssemblyFoldersExSearchLocations", r.SearchPath);
@@ -1347,6 +1347,10 @@ namespace Microsoft.Build.Tasks
         {
             // Set an importance level to be used for secondary messages.
             MessageImportance importance = ChooseReferenceLoggingImportance(reference);
+            if (!Log.LogsMessagesOfImportance(importance))
+            {
+                return;
+            }
 
             // Log the fusion name and whether this is a primary or a dependency.
             LogPrimaryOrDependency(reference, fusionName, importance);
@@ -1413,7 +1417,8 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         private void LogInputs()
         {
-            if (Traits.Instance.EscapeHatches.LogTaskInputs || Silent)
+            MessageImportance importance = MessageImportance.Low;
+            if (Silent || Log.IsTaskInputLoggingEnabled || !Log.LogsMessagesOfImportance(importance))
             {
                 // the inputs will be logged automatically anyway, avoid duplication in the logs
                 return;
@@ -1421,7 +1426,6 @@ namespace Microsoft.Build.Tasks
 
             string indent = Strings.FourSpaces;
             string property = Strings.LogTaskPropertyFormat;
-            MessageImportance importance = MessageImportance.Low;
 
             Log.LogMessage(importance, property, "TargetFrameworkMoniker");
             Log.LogMessage(importance, indent + _targetedFrameworkMoniker);
@@ -3149,23 +3153,26 @@ namespace Microsoft.Build.Tasks
         {
             return Execute
             (
-                new FileExists(p => FileUtilities.FileExistsNoThrow(p)),
-                new DirectoryExists(p => FileUtilities.DirectoryExistsNoThrow(p)),
-                new GetDirectories(Directory.GetDirectories),
-                new GetAssemblyName(AssemblyNameExtension.GetAssemblyNameEx),
-                new GetAssemblyMetadata(AssemblyInformation.GetAssemblyMetadata),
+                p => FileUtilities.FileExistsNoThrow(p),
+                p => FileUtilities.DirectoryExistsNoThrow(p),
+                (p, searchPattern) => Directory.GetDirectories(p, searchPattern),
+                p => AssemblyNameExtension.GetAssemblyNameEx(p),
+                (string path, ConcurrentDictionary<string, AssemblyMetadata> assemblyMetadataCache, out AssemblyNameExtension[] dependencies, out string[] scatterFiles, out FrameworkNameVersioning frameworkName)
+                    => AssemblyInformation.GetAssemblyMetadata(path, assemblyMetadataCache, out dependencies, out scatterFiles, out frameworkName),
 #if FEATURE_WIN32_REGISTRY
-                new GetRegistrySubKeyNames(RegistryHelper.GetSubKeyNames),
-                new GetRegistrySubKeyDefaultValue(RegistryHelper.GetDefaultValue),
+                (baseKey, subkey) => RegistryHelper.GetSubKeyNames(baseKey, subkey),
+                (baseKey, subkey) => RegistryHelper.GetDefaultValue(baseKey, subkey),
 #endif
-                new GetLastWriteTime(NativeMethodsShared.GetLastWriteFileUtcTime),
-                new GetAssemblyRuntimeVersion(AssemblyInformation.GetRuntimeVersion),
+                p => NativeMethodsShared.GetLastWriteFileUtcTime(p),
+                p => AssemblyInformation.GetRuntimeVersion(p),
 #if FEATURE_WIN32_REGISTRY
-                new OpenBaseKey(RegistryHelper.OpenBaseKey),
+                (hive, view) => RegistryHelper.OpenBaseKey(hive, view),
 #endif
-                new GetAssemblyPathInGac(GetAssemblyPathInGac),
-                new IsWinMDFile(AssemblyInformation.IsWinMDFile),
-                new ReadMachineTypeFromPEHeader(ReferenceTable.ReadMachineTypeFromPEHeader)
+                (assemblyName, targetProcessorArchitecture, getRuntimeVersion, targetedRuntimeVersion, fileExists, fullFusionName, specificVersion)
+                    => GetAssemblyPathInGac(assemblyName, targetProcessorArchitecture, getRuntimeVersion, targetedRuntimeVersion, fileExists, fullFusionName, specificVersion),
+                (string fullPath, GetAssemblyRuntimeVersion getAssemblyRuntimeVersion, FileExists fileExists, out string imageRuntimeVersion, out bool isManagedWinmd)
+                    => AssemblyInformation.IsWinMDFile(fullPath, getAssemblyRuntimeVersion, fileExists, out imageRuntimeVersion, out isManagedWinmd),
+                p => ReferenceTable.ReadMachineTypeFromPEHeader(p)
             );
         }
 

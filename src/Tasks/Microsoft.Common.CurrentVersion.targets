@@ -1615,11 +1615,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     ======================================================================================
   -->
 
-  <!-- Managed projects need to have PlatformTarget set for SetPlatform negotiation. Default to $(Platform), which is AnyCPU by default. -->
   <PropertyGroup>
-    <PlatformTarget Condition="'$(EnableDynamicPlatformResolution)' == 'true' and '$(PlatformTarget)' == ''
-                                and '$(MSBuildProjectExtension)' != '.vcxproj' and '$(MSBuildProjectExtension)' != '.nativeproj'">$(Platform)</PlatformTarget>
-
     <UseDefaultPlatformLookupTables Condition="'$(UseDefaultPlatformLookupTables)' == ''">true</UseDefaultPlatformLookupTables>
   </PropertyGroup>
 
@@ -1642,12 +1638,6 @@ Copyright (C) Microsoft Corporation. All rights reserved.
                                               Condition="'%(_MSBuildProjectReferenceExistent.SkipGetPlatformProperties)' != 'true'"/>
     </ItemGroup>
 
-    <!-- Managed Platform "source of truth" is $(PlatformTarget). For cpp it's $(Platform) -->
-    <PropertyGroup>
-      <CurrentPlatform>$(PlatformTarget)</CurrentPlatform>
-      <CurrentPlatform Condition="'$(MSBuildProjectExtension)' == '.vcxproj' or '$(MSBuildProjectExtension)' == '.nativeproj'">$(Platform)</CurrentPlatform>
-    </PropertyGroup>
-
     <!-- Assign default PlatformLookupTables when doing Managed <-> Unmanaged hops -->
     <ItemGroup>
       <!-- If we're looking at a c++ project from a managed project, map managed platforms to native platforms. -->
@@ -1663,7 +1653,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     </ItemGroup>
 
     <GetCompatiblePlatform AnnotatedProjects="@(_ProjectReferencePlatformPossibilities)"
-                           CurrentProjectPlatform="$(CurrentPlatform)"
+                           CurrentProjectPlatform="$(Platform)"
                            PlatformLookupTable="$(PlatformLookupTable)"
                            Condition="'@(_ProjectReferencePlatformPossibilities)' != ''">
       <Output ItemName="_ProjectsWithPlatformAssignment" TaskParameter="AssignedProjectsWithPlatform" />
@@ -1675,13 +1665,12 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     <ItemGroup Condition="'@(_ProjectsWithPlatformAssignment)' != ''">
       <ProjectsWithNearestPlatform Include="@(_ProjectsWithPlatformAssignment)"/>
       <ProjectsWithNearestPlatform Condition="'@(ProjectsWithNearestPlatform)' == '%(Identity)' and '%(ProjectsWithNearestPlatform.NearestPlatform)' != ''">
-        <SetPlatform>PlatformTarget=%(ProjectsWithNearestPlatform.NearestPlatform)</SetPlatform>
-        <SetPlatform Condition="'%(ProjectsWithNearestPlatform.IsVcxOrNativeProj)' == 'true'">Platform=%(ProjectsWithNearestPlatform.NearestPlatform)</SetPlatform>
+        <SetPlatform>Platform=%(ProjectsWithNearestPlatform.NearestPlatform)</SetPlatform>
       </ProjectsWithNearestPlatform>
 
+      <!-- When GetCompatiblePlatform fails to assign NearestPlatform, undefine Platform and let that project build "on its own" -->
       <ProjectsWithNearestPlatform Condition="'@(ProjectsWithNearestPlatform)' == '%(Identity)' and '%(ProjectsWithNearestPlatform.NearestPlatform)' == ''">
-        <UndefineProperties Condition="'%(ProjectsWithNearestPlatform.IsVcxOrNativeProj)' == 'true'">%(ProjectsWithNearestPlatform.UndefineProperties);Platform</UndefineProperties>
-        <UndefineProperties Condition="'%(ProjectsWithNearestPlatform.IsVcxOrNativeProj)' != 'true'">%(ProjectsWithNearestPlatform.UndefineProperties);PlatformTarget</UndefineProperties>
+        <UndefineProperties>%(ProjectsWithNearestPlatform.UndefineProperties);Platform</UndefineProperties>
       </ProjectsWithNearestPlatform>
 
       <_MSBuildProjectReferenceExistent Remove="@(_MSBuildProjectReferenceExistent)" Condition="'%(_MSBuildProjectReferenceExistent.SkipGetPlatformProperties)' != 'true'"/>
@@ -1745,7 +1734,10 @@ Copyright (C) Microsoft Corporation. All rights reserved.
    -->
    <ItemGroup>
       <_MSBuildProjectReferenceExistent Condition="'%(_MSBuildProjectReferenceExistent.SkipGetTargetFrameworkProperties)' == '' and ('%(Extension)' == '.vcxproj' or '%(Extension)' == '.nativeproj')">
-        <!-- When we're dynamically figuring out platform, we need the MSBuild call that retrieves TF data. -->
+        <!-- 
+          Platform negotiation requires the MSBuild task call to GetTargetFrameworks.
+          Don't skip when opted into the feature.
+        -->
         <SkipGetTargetFrameworkProperties Condition="'$(EnableDynamicPlatformResolution)' != 'true'">true</SkipGetTargetFrameworkProperties>
         <UndefineProperties>%(_MSBuildProjectReferenceExistent.UndefineProperties);TargetFramework</UndefineProperties>
       </_MSBuildProjectReferenceExistent>
@@ -1764,7 +1756,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     -->
     <ItemGroup>
       <_MSBuildProjectReferenceExistent Condition="'%(_MSBuildProjectReferenceExistent.SetTargetFramework)' != ''">
-        <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+        <!-- 
+          Platform negotiation requires the MSBuild task call to GetTargetFrameworks.
+          Don't skip when opted into the feature.
+        -->
+        <SkipGetTargetFrameworkProperties Condition="'$(EnableDynamicPlatformResolution)' != 'true'">true</SkipGetTargetFrameworkProperties>
       </_MSBuildProjectReferenceExistent>
     </ItemGroup>
 
@@ -1906,9 +1902,14 @@ Copyright (C) Microsoft Corporation. All rights reserved.
       </_AdditionalTargetFrameworkInfoPropertyWithValue>
     </ItemGroup>
 
+    <PropertyGroup>
+      <_UseAttributeForTargetFrameworkInfoPropertyNames Condition="'$(_UseAttributeForTargetFrameworkInfoPropertyNames)' == ''">false</_UseAttributeForTargetFrameworkInfoPropertyNames>
+    </PropertyGroup>
+
     <CombineTargetFrameworkInfoProperties
         RootElementName="$(TargetFramework)"
-        PropertiesAndValues="@(_AdditionalTargetFrameworkInfoPropertyWithValue)">
+        PropertiesAndValues="@(_AdditionalTargetFrameworkInfoPropertyWithValue)"
+        UseAttributeForTargetFrameworkInfoPropertyNames="$(_UseAttributeForTargetFrameworkInfoPropertyNames)">
       <Output TaskParameter="Result"
               PropertyName="_AdditionalTargetFrameworkInfoProperties"/>
     </CombineTargetFrameworkInfoProperties>
@@ -1929,13 +1930,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     ============================================================
                                     GetTargetFrameworkProperties
 
-    Overrridden by cross-targeting projects to return the set of
-    properties (in the form "key1=value1;...keyN=valueN") needed
-    to build it with the best target for the referring project's
-    target framework.
-
-    The referring project's $(TargetFrameworkMoniker) is passed
-    in as $(ReferringTargetFramework)
+    OBSOLETE: present only for theoretical backward compatibility.
   -->
   <Target Name="GetTargetFrameworkProperties" />
 
@@ -2415,9 +2410,10 @@ Copyright (C) Microsoft Corporation. All rights reserved.
     ====================================================================================================
   -->
   <Target Name="GenerateBindingRedirects"
-    Inputs="$(MSBuildAllProjects);@(AppConfigFile);$(ResolveAssemblyReferencesStateFile);$(IntermediateOutputPath);@(SuggestedBindingRedirects)"
+    Inputs="$(MSBuildAllProjects);@(AppConfigFile);$(ResolveAssemblyReferencesStateFile);$(SuggestedBindingRedirectsCacheFile)"
     Outputs="$(_GenerateBindingRedirectsIntermediateAppConfig)"
-    Condition="'$(AutoGenerateBindingRedirects)' == 'true' and '$(GenerateBindingRedirectsOutputType)' == 'true'">
+    Condition="'$(AutoGenerateBindingRedirects)' == 'true' and '$(GenerateBindingRedirectsOutputType)' == 'true'"
+    DependsOnTargets="_GenerateSuggestedBindingRedirectsCache">
 
     <GenerateBindingRedirects
       AppConfigFile="@(AppConfigWithTargetPath)"
@@ -3619,6 +3615,33 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 
   <!--
     ============================================================
+                                        _GenerateSuggestedBindingRedirectsCache
+    Generate a file used to track whether suggested binding redirects changed between builds.
+    @(SuggestedBindingRedirects) never contains a file on disk, so create a file
+    that contains a hash of the items to prevent `GenerateBindingRedirects`
+    from running every build.
+
+    See https://github.com/dotnet/msbuild/issues/5943 for details.
+    ============================================================
+    -->
+  <Target Name="_GenerateSuggestedBindingRedirectsCache" Condition="'$(DesignTimeBuild)' != 'true' and '$(BuildingProject)' == 'true'" DependsOnTargets="ResolveAssemblyReferences">
+    <PropertyGroup>
+      <SuggestedBindingRedirectsCacheFile>$(IntermediateOutputPath)$(MSBuildProjectFile).SuggestedBindingRedirects.cache</SuggestedBindingRedirectsCacheFile>
+    </PropertyGroup>
+
+      <Hash ItemsToHash="@(SuggestedBindingRedirects)">
+        <Output TaskParameter="HashResult" PropertyName="SuggestedBindingRedirectsHash"/>
+      </Hash>
+
+      <WriteLinesToFile Lines="$(SuggestedBindingRedirectsHash)" File="$(SuggestedBindingRedirectsCacheFile)" Overwrite="true" WriteOnlyWhenDifferent="true"/>
+
+      <ItemGroup>
+        <FileWrites Include="$(SuggestedBindingRedirectsCacheFile)"/>
+      </ItemGroup>
+  </Target>
+
+  <!--
+    ============================================================
                                         _GenerateCompileDependencyCache
 
     Generate a file used to track compiler dependencies between incremental build
@@ -3838,7 +3861,7 @@ Copyright (C) Microsoft Corporation. All rights reserved.
 
     <PropertyGroup>
       <_ALExeToolPath>$(TargetFrameworkSDKToolsDirectory)</_ALExeToolPath>
-      <_ALExeToolPath Condition="'$(PlatformTarget)' == 'x64'">$(TargetFrameworkSDKToolsDirectory)$(PlatformTarget)\</_ALExeToolPath>
+      <_ALExeToolPath Condition="'$(PlatformTarget)' == 'x64' and !$(_ALExeToolPath.EndsWith('x64\'))">$(TargetFrameworkSDKToolsDirectory)x64\</_ALExeToolPath>
     </PropertyGroup>
 
     <MakeDir
@@ -4803,10 +4826,12 @@ Copyright (C) Microsoft Corporation. All rights reserved.
          not be considered up to date, so touch this marker file that is considered an
          input to projects that reference this one. -->
     <Touch Files="@(CopyUpToDateMarker)"
-           AlwaysCreate="true"
-           Condition="'@(ReferencesCopiedInThisBuild)' != '' and '$(WroteAtLeastOneFile)' == 'true'">
-        <Output TaskParameter="TouchedFiles" ItemName="FileWrites" />
-    </Touch>
+      AlwaysCreate="true"
+      Condition="'@(ReferencesCopiedInThisBuild)' != '' and '$(WroteAtLeastOneFile)' == 'true'" />
+
+    <ItemGroup>
+      <FileWrites Include="@(CopyUpToDateMarker)" />
+    </ItemGroup>
 
   </Target>
 
@@ -4826,13 +4851,11 @@ Copyright (C) Microsoft Corporation. All rights reserved.
                                         GetCopyToOutputDirectoryItems
 
     Get all project items that may need to be transferred to the output directory.
-    This includes baggage items from transitively referenced projects. It would appear
-    that this target computes full transitive closure of content items for all referenced
-    projects; however that is not the case. It only collects the content items from its
-    immediate children and not children of children. The reason this happens is that
-    the ProjectReferenceWithConfiguration list that is consumed by _SplitProjectReferencesByFileExistence
-    is only populated in the current project and is empty in the children. The empty list
-    causes _MSBuildProjectReferenceExistent to be empty and terminates the recursion.
+    This includes baggage items from transitively referenced projects.
+
+    As of 17.0, content items are copied transitively by default.
+    Set `MSBuildCopyContentTransitively` to false to opt out.
+    See https://github.com/dotnet/msbuild/pull/6622 for more info.
     ============================================================
     -->
   <PropertyGroup>
