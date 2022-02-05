@@ -4,7 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+#if FEATURE_APPDOMAIN
 using System.Threading.Tasks;
+#endif
 
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
@@ -13,6 +15,8 @@ using Microsoft.Build.Shared;
 using ElementLocation = Microsoft.Build.Construction.ElementLocation;
 using TargetLoggingContext = Microsoft.Build.BackEnd.Logging.TargetLoggingContext;
 using TaskLoggingContext = Microsoft.Build.BackEnd.Logging.TaskLoggingContext;
+
+#nullable disable
 
 namespace Microsoft.Build.BackEnd
 {
@@ -302,13 +306,8 @@ namespace Microsoft.Build.BackEnd
                 // taskName may be null
                 ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskLoadFailure", taskName, loadInfo.AssemblyLocation, e.Message);
             }
-            catch (Exception e) // Catching Exception, but rethrowing unless it's a well-known exception.
+            catch (Exception e) when (!ExceptionHandling.NotExpectedReflectionException(e))
             {
-                if (ExceptionHandling.NotExpectedReflectionException(e))
-                {
-                    throw;
-                }
-
                 ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskLoadFailure", taskName, loadInfo.AssemblyLocation, e.Message);
             }
 
@@ -355,15 +354,12 @@ namespace Microsoft.Build.BackEnd
 
                 mergedParameters ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-                string runtime = null;
-                string architecture = null;
-
-                if (!mergedParameters.TryGetValue(XMakeAttributes.runtime, out runtime))
+                if (!mergedParameters.ContainsKey(XMakeAttributes.runtime))
                 {
-                    mergedParameters[XMakeAttributes.runtime] = XMakeAttributes.MSBuildRuntimeValues.clr4;
+                    mergedParameters[XMakeAttributes.runtime] = XMakeAttributes.GetCurrentMSBuildRuntime();
                 }
 
-                if (!mergedParameters.TryGetValue(XMakeAttributes.architecture, out architecture))
+                if (!mergedParameters.ContainsKey(XMakeAttributes.architecture))
                 {
                     mergedParameters[XMakeAttributes.architecture] = XMakeAttributes.GetCurrentMSBuildArchitecture();
                 }
@@ -443,13 +439,8 @@ namespace Microsoft.Build.BackEnd
                 // taskName may be null
                 ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskLoadFailure", taskName, _loadedType.Assembly.AssemblyLocation, e.Message);
             }
-            catch (Exception e) // Catching Exception, but rethrowing unless it's a well-known exception.
+            catch (Exception e) when (!ExceptionHandling.NotExpectedReflectionException(e))
             {
-                if (ExceptionHandling.NotExpectedReflectionException(e))
-                {
-                    throw;
-                }
-
                 ProjectErrorUtilities.ThrowInvalidProject(elementLocation, "TaskLoadFailure", taskName, _loadedType.Assembly.AssemblyLocation, e.Message);
             }
 
@@ -575,10 +566,8 @@ namespace Microsoft.Build.BackEnd
             {
                 mergedParameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-                string taskRuntime;
-                taskIdentityParameters.TryGetValue(XMakeAttributes.runtime, out taskRuntime);
-                string usingTaskRuntime;
-                factoryIdentityParameters.TryGetValue(XMakeAttributes.runtime, out usingTaskRuntime);
+                taskIdentityParameters.TryGetValue(XMakeAttributes.runtime, out string taskRuntime);
+                factoryIdentityParameters.TryGetValue(XMakeAttributes.runtime, out string usingTaskRuntime);
 
                 if (!XMakeAttributes.TryMergeRuntimeValues(taskRuntime, usingTaskRuntime, out mergedRuntime))
                 {
@@ -589,10 +578,8 @@ namespace Microsoft.Build.BackEnd
                     mergedParameters.Add(XMakeAttributes.runtime, mergedRuntime);
                 }
 
-                string taskArchitecture;
-                taskIdentityParameters.TryGetValue(XMakeAttributes.architecture, out taskArchitecture);
-                string usingTaskArchitecture;
-                factoryIdentityParameters.TryGetValue(XMakeAttributes.architecture, out usingTaskArchitecture);
+                taskIdentityParameters.TryGetValue(XMakeAttributes.architecture, out string taskArchitecture);
+                factoryIdentityParameters.TryGetValue(XMakeAttributes.architecture, out string usingTaskArchitecture);
 
                 if (!XMakeAttributes.TryMergeArchitectureValues(taskArchitecture, usingTaskArchitecture, out mergedArchitecture))
                 {

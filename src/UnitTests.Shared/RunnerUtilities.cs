@@ -4,6 +4,8 @@ using System;
 using System.Diagnostics;
 using Xunit.Abstractions;
 
+#nullable disable
+
 namespace Microsoft.Build.UnitTests.Shared
 {
     public static class RunnerUtilities
@@ -42,7 +44,7 @@ namespace Microsoft.Build.UnitTests.Shared
                 var comSpec = Environment.GetEnvironmentVariable("ComSpec");
 
                 // /D: Do not load AutoRun configuration from the registry (perf)
-                arguments = $"{(Traits.Instance.EscapeHatches.UseAutoRunWhenLaunchingProcessUnderCmd ? String.Empty : "/D ")}/C \"{pathToExecutable} {arguments}\"";
+                arguments = $"/D /C \"{pathToExecutable} {arguments}\"";
                 pathToExecutable = comSpec;
             }
             else

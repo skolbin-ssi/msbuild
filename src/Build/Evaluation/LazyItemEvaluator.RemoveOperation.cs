@@ -2,11 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Build.Construction;
+using Microsoft.Build.Framework;
 using Microsoft.Build.Shared;
 using Microsoft.Build.Utilities;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+
+#nullable disable
 
 namespace Microsoft.Build.Evaluation
 {
@@ -27,7 +30,7 @@ namespace Microsoft.Build.Evaluation
                     new BuildEventFileInfo(string.Empty),
                     "OM_MatchOnMetadataIsRestrictedToReferencedItems");
 
-                if (!_matchOnMetadata.IsEmpty)
+                if (_matchOnMetadata.Any())
                 {
                     _metadataSet = new MetadataTrie<P, I>(builder.MatchOnMetadataOptions, _matchOnMetadata, _itemSpec);
                 }
@@ -46,7 +49,7 @@ namespace Microsoft.Build.Evaluation
                     return;
                 }
 
-                bool matchingOnMetadata = !_matchOnMetadata.IsEmpty;
+                bool matchingOnMetadata = _matchOnMetadata.Any();
                 if (!matchingOnMetadata)
                 {
                     if (ItemspecContainsASingleBareItemReference(_itemSpec, _itemElement.ItemType))
@@ -68,7 +71,7 @@ namespace Microsoft.Build.Evaluation
                     }
                 }
 
-                // todo Perf: do not match against the globs: https://github.com/Microsoft/msbuild/issues/2329
+                // todo Perf: do not match against the globs: https://github.com/dotnet/msbuild/issues/2329
                 HashSet<I> items = null;
                 foreach (ItemData item in listBuilder)
                 {

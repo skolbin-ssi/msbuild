@@ -15,10 +15,11 @@ using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Internal;
 using Microsoft.Build.Shared;
-using Microsoft.Build.Utilities;
 #if FEATURE_APPDOMAIN
 using System.Runtime.Remoting;
 #endif
+
+#nullable disable
 
 namespace Microsoft.Build.CommandLine
 {
@@ -612,9 +613,7 @@ namespace Microsoft.Build.CommandLine
             // Snapshot the current environment
             _savedEnvironment = CommunicationsUtilities.GetEnvironmentVariables();
 
-            string pipeName = "MSBuild" + Process.GetCurrentProcess().Id;
-
-            _nodeEndpoint = new NodeEndpointOutOfProcTaskHost(pipeName);
+            _nodeEndpoint = new NodeEndpointOutOfProcTaskHost();
             _nodeEndpoint.OnLinkStatusChanged += new LinkStatusChangedDelegate(OnLinkStatusChanged);
             _nodeEndpoint.Listen(this);
 
@@ -908,22 +907,14 @@ namespace Microsoft.Build.CommandLine
                     taskParams
                 );
             }
-            catch (Exception e)
+            catch (ThreadAbortException)
             {
-                if (e is ThreadAbortException)
-                {
-                    // This thread was aborted as part of Cancellation, we will return a failure task result
-                    taskResult = new OutOfProcTaskHostTaskResult(TaskCompleteType.Failure);
-                }
-                else
-                if (ExceptionHandling.IsCriticalException(e))
-                {
-                    throw;
-                }
-                else
-                {
-                    taskResult = new OutOfProcTaskHostTaskResult(TaskCompleteType.CrashedDuringExecution, e);
-                }
+                // This thread was aborted as part of Cancellation, we will return a failure task result
+                taskResult = new OutOfProcTaskHostTaskResult(TaskCompleteType.Failure);
+            }
+            catch (Exception e) when (!ExceptionHandling.IsCriticalException(e))
+            {
+                taskResult = new OutOfProcTaskHostTaskResult(TaskCompleteType.CrashedDuringExecution, e);
             }
             finally
             {
@@ -934,10 +925,7 @@ namespace Microsoft.Build.CommandLine
                     IDictionary<string, string> currentEnvironment = CommunicationsUtilities.GetEnvironmentVariables();
                     currentEnvironment = UpdateEnvironmentForMainNode(currentEnvironment);
 
-                    if (taskResult == null)
-                    {
-                        taskResult = new OutOfProcTaskHostTaskResult(TaskCompleteType.Failure);
-                    }
+                    taskResult ??= new OutOfProcTaskHostTaskResult(TaskCompleteType.Failure);
 
                     lock (_taskCompleteLock)
                     {
