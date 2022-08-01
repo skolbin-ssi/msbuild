@@ -88,7 +88,7 @@ namespace Microsoft.Build.BackEnd.Logging
                     // Get the size of the console buffer so messages can be formatted to the console width
                     try
                     {
-                        _bufferWidth = Console.BufferWidth;
+                        _bufferWidth = ConsoleConfiguration.BufferWidth;
                         _alignMessages = true;
                     }
                     catch (Exception)
@@ -1705,12 +1705,9 @@ namespace Microsoft.Build.BackEnd.Logging
                     entryPoint.MessageIndentLevel = 7;
                 }
 
-                if (_startedEvent == null)
-                {
-                    _startedEvent = comparer == null
-                        ? new Dictionary<BuildEventContext, object>()
-                        : new Dictionary<BuildEventContext, object>(comparer);
-                }
+                _startedEvent ??= comparer == null
+                    ? new Dictionary<BuildEventContext, object>()
+                    : new Dictionary<BuildEventContext, object>(comparer);
 
                 if (!_startedEvent.ContainsKey(buildEventContext))
                 {
