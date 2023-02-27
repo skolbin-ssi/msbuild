@@ -1,2 +1,0 @@
-Microsoft.Build.Tasks.XslTransformation.PreserveWhitespace.get -> bool
-Microsoft.Build.Tasks.XslTransformation.PreserveWhitespace.set -> void

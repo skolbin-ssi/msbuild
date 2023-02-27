@@ -1,17 +1,18 @@
-// Copyright (c) Microsoft. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Tasks;
 using Microsoft.Build.Utilities;
 using Xunit;
+using Xunit.NetCore.Extensions;
 
 #nullable disable
 
 namespace Microsoft.Build.UnitTests
 {
-    sealed public class AssignCulture_Tests
+    public sealed class AssignCulture_Tests
     {
         /*
         * Method:   Basic
@@ -241,8 +242,7 @@ namespace Microsoft.Build.UnitTests
             Assert.Equal("MyResource.resx", t.CultureNeutralAssignedFiles[0].ItemSpec);
         }
 
-        [Theory]
-        [SkipOnTargetFramework(TargetFrameworkMonikers.NetFramework, "These cultures are not returned via Culture api on net472.")]
+        [DotNetOnlyTheory(additionalMessage: "These cultures are not returned via Culture api on net472.")]
         [InlineData("sh-BA")]
         [InlineData("shi-MA")]
         public void AliasedCultures_SupportedOnNetCore(string culture)
@@ -255,6 +255,24 @@ namespace Microsoft.Build.UnitTests
 
             Assert.Single(t.AssignedFiles);
             Assert.Single(t.CultureNeutralAssignedFiles);
+            Assert.Equal(culture, t.AssignedFiles[0].GetMetadata("Culture"));
+            Assert.Equal($"MyResource.{culture}.resx", t.AssignedFiles[0].ItemSpec);
+            Assert.Equal("MyResource.resx", t.CultureNeutralAssignedFiles[0].ItemSpec);
+        }
+
+        [DotNetOnlyFact(additionalMessage: "Pseudoloc is special-cased in .NET relative to Framework.")]
+        public void Pseudolocales_CaseInsensitive()
+        {
+            string culture = "qps-Ploc";
+            AssignCulture t = new AssignCulture();
+            t.BuildEngine = new MockEngine();
+            ITaskItem i = new TaskItem($"MyResource.{culture}.resx");
+            t.Files = new ITaskItem[] { i };
+            t.Execute();
+
+            Assert.Single(t.AssignedFiles);
+            Assert.Single(t.CultureNeutralAssignedFiles);
+            Assert.Equal("true", t.AssignedFiles[0].GetMetadata("WithCulture"));
             Assert.Equal(culture, t.AssignedFiles[0].GetMetadata("Culture"));
             Assert.Equal($"MyResource.{culture}.resx", t.AssignedFiles[0].ItemSpec);
             Assert.Equal("MyResource.resx", t.CultureNeutralAssignedFiles[0].ItemSpec);

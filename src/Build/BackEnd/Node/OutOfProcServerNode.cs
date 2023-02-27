@@ -1,5 +1,5 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
 using System.Collections.Concurrent;
@@ -7,11 +7,11 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Build.BackEnd;
-using Microsoft.Build.Shared;
-using Microsoft.Build.Internal;
-using Microsoft.Build.Execution;
 using Microsoft.Build.BackEnd.Logging;
+using Microsoft.Build.Execution;
 using Microsoft.Build.Framework.Telemetry;
+using Microsoft.Build.Internal;
+using Microsoft.Build.Shared;
 
 namespace Microsoft.Build.Experimental
 {
@@ -67,6 +67,10 @@ namespace Microsoft.Build.Experimental
         /// </summary>
         private Exception? _shutdownException = null;
 
+        /// <summary>
+        /// Indicate that cancel has been requested and initiated.
+        /// </summary>        
+        private bool _cancelRequested = false;
         private string _serverBusyMutexName = default!;
 
         public OutOfProcServerNode(BuildCallback buildFunction)
@@ -107,7 +111,7 @@ namespace Microsoft.Build.Experimental
                 return NodeEngineShutdownReason.Error;
             }
 
-            while(true)
+            while (true)
             {
                 NodeEngineShutdownReason shutdownReason = RunInternal(out shutdownException, handshake);
                 if (shutdownReason != NodeEngineShutdownReason.BuildCompleteReuse)
@@ -312,7 +316,12 @@ namespace Microsoft.Build.Experimental
             _shutdownEvent.Set();
         }
 
-        private static void HandleBuildCancel() => BuildManager.DefaultBuildManager.CancelAllSubmissions();
+        private void HandleBuildCancel()
+        {
+            CommunicationsUtilities.Trace("Received request to cancel build running on MSBuild Server. MSBuild server will shutdown.}");
+            _cancelRequested = true;
+            BuildManager.DefaultBuildManager.CancelAllSubmissions();
+        }
 
         private void HandleServerNodeBuildCommandAsync(ServerNodeBuildCommand command)
         {
@@ -322,7 +331,7 @@ namespace Microsoft.Build.Experimental
                 {
                     HandleServerNodeBuildCommand(command);
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     _shutdownException = e;
                     _shutdownReason = NodeEngineShutdownReason.Error;
@@ -352,19 +361,21 @@ namespace Microsoft.Build.Experimental
             Thread.CurrentThread.CurrentCulture = command.Culture;
             Thread.CurrentThread.CurrentUICulture = command.UICulture;
 
+            // Reconfigure static BuildParameters.StartupDirectory to have this value
+            // same as startup directory of msbuild entry client or dotnet CLI.
+            BuildParameters.StartupDirectory = command.StartupDirectory;
+
             // Configure console configuration so Loggers can change their behavior based on Target (client) Console properties.
             ConsoleConfiguration.Provider = command.ConsoleConfiguration;
 
             // Initiate build telemetry
-            if (KnownTelemetry.BuildTelemetry == null)
-            {
-                KnownTelemetry.BuildTelemetry = new BuildTelemetry();
-            }
             if (command.PartialBuildTelemetry != null)
             {
-                KnownTelemetry.BuildTelemetry.StartAt = command.PartialBuildTelemetry.StartedAt;
-                KnownTelemetry.BuildTelemetry.InitialServerState = command.PartialBuildTelemetry.InitialServerState;
-                KnownTelemetry.BuildTelemetry.ServerFallbackReason = command.PartialBuildTelemetry.ServerFallbackReason;
+                BuildTelemetry buildTelemetry = KnownTelemetry.PartialBuildTelemetry ??= new BuildTelemetry();
+
+                buildTelemetry.StartAt = command.PartialBuildTelemetry.StartedAt;
+                buildTelemetry.InitialServerState = command.PartialBuildTelemetry.InitialServerState;
+                buildTelemetry.ServerFallbackReason = command.PartialBuildTelemetry.ServerFallbackReason;
             }
 
             // Also try our best to increase chance custom Loggers which use Console static members will work as expected.
@@ -402,7 +413,7 @@ namespace Microsoft.Build.Experimental
                 Console.SetOut(oldOut);
                 Console.SetError(oldErr);
             }
-          
+
             // On Windows, a process holds a handle to the current directory,
             // so reset it away from a user-requested folder that may get deleted.
             NativeMethodsShared.SetCurrentDirectory(BuildEnvironmentHelper.Instance.CurrentMSBuildToolsDirectory);
@@ -411,10 +422,10 @@ namespace Microsoft.Build.Experimental
             var response = new ServerNodeBuildResult(buildResult.exitCode, buildResult.exitType);
             SendPacket(response);
 
-            _shutdownReason = NodeEngineShutdownReason.BuildCompleteReuse;
+            // Shutdown server if cancel was requested. This is consistent with nodes behavior.
+            _shutdownReason = _cancelRequested ? NodeEngineShutdownReason.BuildComplete : NodeEngineShutdownReason.BuildCompleteReuse;
             _shutdownEvent.Set();
         }
-
         internal sealed class RedirectConsoleWriter : StringWriter
         {
             private readonly Action<string> _writeCallback;
