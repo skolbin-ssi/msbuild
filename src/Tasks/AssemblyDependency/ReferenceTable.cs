@@ -40,6 +40,11 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         private readonly HashSet<string> _externallyResolvedPrimaryReferences = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// The keys are normalized full paths of primary references resolved by an external entity to RAR and considered immutable, the values are assembly names or null if not known.
+        /// </summary>
+        private readonly Dictionary<string, AssemblyNameExtension> _externallyResolvedImmutableFiles = new Dictionary<string, AssemblyNameExtension>(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>The table of remapped assemblies. Used for Unification.</summary>
         private IEnumerable<DependentAssembly> _remappedAssemblies = Enumerable.Empty<DependentAssembly>();
 
@@ -824,6 +829,34 @@ namespace Microsoft.Build.Tasks
         }
 
         /// <summary>
+        /// Tries to create an <see cref="AssemblyNameExtension"/> out of a primary reference metadata.
+        /// </summary>
+        private static AssemblyNameExtension GetAssemblyNameFromItemMetadata(ITaskItem item)
+        {
+            string version = item.GetMetadata(ItemMetadataNames.assemblyVersion);
+            if (string.IsNullOrEmpty(version))
+            {
+                return null;
+            }
+
+            string publicKeyToken = item.GetMetadata(ItemMetadataNames.publicKeyToken);
+            if (string.IsNullOrEmpty(publicKeyToken))
+            {
+                return null;
+            }
+
+            string name = item.GetMetadata(ItemMetadataNames.assemblyName);
+            if (string.IsNullOrEmpty(name))
+            {
+                // Fall back to inferring assembly name from file name.
+                name = item.GetMetadata(FileUtilities.ItemSpecModifiers.Filename);
+            }
+
+            AssemblyName assemblyName = new AssemblyName($"{name}, Version={version}, Culture=neutral, PublicKeyToken={publicKeyToken}");
+            return new AssemblyNameExtension(assemblyName);
+        }
+
+        /// <summary>
         /// Given an item that refers to a file name, make it a primary reference.
         /// </summary>
         private void SetPrimaryFileItem(ITaskItem referenceAssemblyFile)
@@ -1225,6 +1258,17 @@ namespace Microsoft.Build.Tasks
             string rawFileNameCandidate,
             Reference reference)
         {
+            bool isImmutableFrameworkReference = false;
+            if (ChangeWaves.AreFeaturesEnabled(ChangeWaves.Wave17_8))
+            {
+                // For a path to be an immutable reference, it must be externally resolved and has a FrameworkReferenceName defined.
+                if (assemblyName == null && !string.IsNullOrEmpty(rawFileNameCandidate) && reference.IsPrimary && reference.ExternallyResolved)
+                {
+                    string frameworkReferenceName = reference.PrimarySourceItem.GetMetadata(ItemMetadataNames.frameworkReferenceName);
+                    isImmutableFrameworkReference = !string.IsNullOrEmpty(frameworkReferenceName);
+                }
+            }
+
             // Now, resolve this reference.
             string resolvedPath = null;
             string resolvedSearchPath = String.Empty;
@@ -1272,6 +1316,7 @@ namespace Microsoft.Build.Tasks
                     reference.SDKName,
                     rawFileNameCandidate,
                     reference.IsPrimary,
+                    isImmutableFrameworkReference,
                     reference.WantSpecificVersion,
                     reference.GetExecutableExtensions(_allowedAssemblyExtensions),
                     reference.HintPath,
@@ -1291,7 +1336,13 @@ namespace Microsoft.Build.Tasks
             // If the path was resolved, then specify the full path on the reference.
             if (resolvedPath != null)
             {
-                reference.FullPath = FileUtilities.NormalizePath(resolvedPath);
+                resolvedPath = FileUtilities.NormalizePath(resolvedPath);
+                if (isImmutableFrameworkReference)
+                {
+                    _externallyResolvedImmutableFiles[resolvedPath] = GetAssemblyNameFromItemMetadata(reference.PrimarySourceItem);
+                }
+                reference.FullPath = resolvedPath;
+
                 reference.ResolvedSearchPath = resolvedSearchPath;
                 reference.UserRequestedSpecificFile = userRequestedSpecificFile;
             }
@@ -1331,9 +1382,10 @@ namespace Microsoft.Build.Tasks
                 }
 
                 // Go through each of the references, we go through this table because in general it will be considerably smaller than the blacklist. (10's of references vs 100's of black list items)
-                foreach (AssemblyNameExtension assemblyName in References.Keys)
+                foreach (KeyValuePair<AssemblyNameExtension, Reference> assembly in References)
                 {
-                    Reference assemblyReference = References[assemblyName];
+                    AssemblyNameExtension assemblyName = assembly.Key;
+                    Reference assemblyReference = assembly.Value;
 
                     AddToDependencyGraph(dependencyGraph, assemblyName, assemblyReference);
 
@@ -1495,12 +1547,12 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         internal AssemblyNameExtension GetReferenceFromItemSpec(string itemSpec)
         {
-            foreach (AssemblyNameExtension assemblyName in References.Keys)
+            foreach (KeyValuePair<AssemblyNameExtension, Reference> assembly in References)
             {
-                Reference assemblyReference = References[assemblyName];
+                Reference assemblyReference = assembly.Value;
                 if (assemblyReference.IsPrimary && assemblyReference.PrimarySourceItem.ItemSpec.Equals(itemSpec, StringComparison.OrdinalIgnoreCase))
                 {
-                    return assemblyName;
+                    return assembly.Key;
                 }
             }
 
@@ -1731,14 +1783,14 @@ namespace Microsoft.Build.Tasks
         /// </summary>
         private void ResolveAssemblyFilenames()
         {
-            foreach (AssemblyNameExtension assemblyName in References.Keys)
+            foreach (KeyValuePair<AssemblyNameExtension, Reference> assembly in References)
             {
-                Reference reference = GetReference(assemblyName);
+                Reference reference = assembly.Value;
 
                 // Has this reference been resolved to a file name?
                 if (!reference.IsResolved && !reference.IsUnresolvable)
                 {
-                    ResolveReference(assemblyName, null, reference);
+                    ResolveReference(assembly.Key, null, reference);
                 }
             }
         }
@@ -2153,15 +2205,18 @@ namespace Microsoft.Build.Tasks
         private static void RemoveReferencesWithoutConflicts(
             Dictionary<string, List<AssemblyNameReference>> baseNameToReferences)
         {
-            string[] baseNames = new string[baseNameToReferences.Count];
-            baseNameToReferences.Keys.CopyTo(baseNames, 0);
-
-            foreach (string baseName in baseNames)
+            List<string> toRemove = new(baseNameToReferences.Count);
+            foreach (KeyValuePair<string, List<AssemblyNameReference>> kvp in baseNameToReferences)
             {
-                if (baseNameToReferences[baseName].Count == 1)
+                if (kvp.Value.Count == 1)
                 {
-                    baseNameToReferences.Remove(baseName);
+                    toRemove.Add(kvp.Key);
                 }
+            }
+
+            foreach (string key in toRemove)
+            {
+                baseNameToReferences.Remove(key);
             }
         }
 
@@ -3095,10 +3150,11 @@ namespace Microsoft.Build.Tasks
             bool anyMarkedReference = false;
             ListOfExcludedAssemblies = new List<string>();
 
-            foreach (AssemblyNameExtension assemblyName in References.Keys)
+            foreach (KeyValuePair<AssemblyNameExtension, Reference> assembly in References)
             {
+                AssemblyNameExtension assemblyName = assembly.Key;
+                Reference reference = assembly.Value;
                 string assemblyFullName = assemblyName.FullName;
-                Reference reference = GetReference(assemblyName);
                 reference.ReferenceVersion = assemblyName.Version;
 
                 MarkReferenceWithHighestVersionInCurrentRedistList(assemblyName, reference);
@@ -3150,6 +3206,29 @@ namespace Microsoft.Build.Tasks
             }
 
             return anyMarkedReference;
+        }
+
+        /// <summary>
+        /// Returns true if the full path passed in <paramref name="path"/> represents a file that came from an external trusted
+        /// entity and is guaranteed to be immutable.
+        /// </summary>
+        /// <param name="path">The path to check.</param>
+        /// <returns>True if known to be immutable, false otherwise.</returns>
+        internal bool IsImmutableFile(string path)
+        {
+            return _externallyResolvedImmutableFiles.ContainsKey(path);
+        }
+
+        /// <summary>
+        /// Returns the assembly name of a file if the file came from an external trusted entity and is considered immutable.
+        /// </summary>
+        /// <param name="path">The file path.</param>
+        /// <returns>Assembly name or null if not known.</returns>
+        internal AssemblyNameExtension GetImmutableFileAssemblyName(string path)
+        {
+            return _externallyResolvedImmutableFiles.TryGetValue(path, out AssemblyNameExtension assemblyNameExtension)
+                ? assemblyNameExtension
+                : null;
         }
     }
 }
