@@ -5,7 +5,6 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Build.Framework;
@@ -128,14 +127,8 @@ namespace Microsoft.Build.Tasks
                     }
                     else
                     {
-                        StringBuilder flattenedMessage = new StringBuilder(actualException.Message);
-                        Exception excep = actualException;
-                        while (excep.InnerException != null)
-                        {
-                            excep = excep.InnerException;
-                            flattenedMessage.Append(" ---> ").Append(excep.Message);
-                        }
-                        Log.LogErrorWithCodeFromResources("DownloadFile.ErrorDownloading", SourceUrl, flattenedMessage.ToString());
+                        string flattenedMessage = TaskLoggingHelper.GetInnerExceptionMessageString(e);
+                        Log.LogErrorWithCodeFromResources("DownloadFile.ErrorDownloading", SourceUrl, flattenedMessage);
                         Log.LogMessage(MessageImportance.Low, actualException.ToString());
                         break;
                     }
@@ -153,6 +146,7 @@ namespace Microsoft.Build.Tasks
         private async Task DownloadAsync(Uri uri, CancellationToken cancellationToken)
         {
             // The main reason to use HttpClient vs WebClient is because we can pass a message handler for unit tests to mock
+#pragma warning disable CA2000 // Dispose objects before losing scope because HttpClientHandler is disposed by HTTPClient.Dispose()
             using (var client = new HttpClient(HttpMessageHandler ?? new HttpClientHandler(), disposeHandler: true) { Timeout = TimeSpan.FromMilliseconds(Timeout) })
             {
                 // Only get the response without downloading the file so we can determine if the file is already up-to-date
@@ -233,6 +227,7 @@ namespace Microsoft.Build.Tasks
                     }
                 }
             }
+#pragma warning restore CA2000 // Dispose objects before losing scope
         }
 
         /// <summary>

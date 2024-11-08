@@ -215,6 +215,20 @@ namespace Microsoft.Build.Framework
             this.endColumnNumber = endColumnNumber;
         }
 
+        protected BuildMessageEventArgs(
+           string message,
+           string file,
+           int lineNumber,
+           int columnNumber,
+           MessageImportance importance)
+            : base(message, helpKeyword: null, senderName: null)
+        {
+            this.importance = importance;
+            this.file = file;
+            this.lineNumber = lineNumber;
+            this.columnNumber = columnNumber;
+        }
+
         private MessageImportance importance;
 
         [OptionalField(VersionAdded = 2)]
@@ -304,17 +318,21 @@ namespace Microsoft.Build.Framework
         public string Subcategory => subcategory;
 
         /// <summary>
-        /// Code associated with event. 
+        /// Code associated with event.
         /// </summary>
         public string Code => code;
 
         /// <summary>
         /// File associated with event.
         /// </summary>
-        public string File => file;
+        public string File
+        {
+            get => file;
+            internal set => file = value;
+        }
 
         /// <summary>
-        /// Line number of interest in associated file. 
+        /// Line number of interest in associated file.
         /// </summary>
         public int LineNumber
         {
@@ -323,7 +341,7 @@ namespace Microsoft.Build.Framework
         }
 
         /// <summary>
-        /// Column number of interest in associated file. 
+        /// Column number of interest in associated file.
         /// </summary>
         public int ColumnNumber
         {
@@ -332,12 +350,12 @@ namespace Microsoft.Build.Framework
         }
 
         /// <summary>
-        /// Ending line number of interest in associated file. 
+        /// Ending line number of interest in associated file.
         /// </summary>
         public int EndLineNumber => endLineNumber;
 
         /// <summary>
-        /// Ending column number of interest in associated file. 
+        /// Ending column number of interest in associated file.
         /// </summary>
         public int EndColumnNumber => endColumnNumber;
 

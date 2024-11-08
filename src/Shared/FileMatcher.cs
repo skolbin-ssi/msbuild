@@ -92,7 +92,7 @@ namespace Microsoft.Build.Shared
                 path,
                 pattern,
                 projectDirectory,
-                stripProjectDirectory).ToArray(),
+                stripProjectDirectory),
             fileEntryExpansionCache)
         {
         }
@@ -135,8 +135,8 @@ namespace Microsoft.Build.Shared
                         ? allEntriesForPath.Where(o => IsFileNameMatch(o, pattern))
                         : allEntriesForPath;
                     return stripProjectDirectory
-                        ? RemoveProjectDirectory(filteredEntriesForPath, directory).ToArray()
-                        : filteredEntriesForPath.ToArray();
+                        ? RemoveProjectDirectory(filteredEntriesForPath, directory).ToList()
+                        : filteredEntriesForPath.ToList();
                 };
         }
 
@@ -231,7 +231,7 @@ namespace Microsoft.Build.Shared
                     ErrorUtilities.ThrowInternalError("Unexpected filesystem entity type.");
                     break;
             }
-            return Array.Empty<string>();
+            return [];
         }
 
         /// <summary>
@@ -252,7 +252,7 @@ namespace Microsoft.Build.Shared
                         ? fileSystem.EnumerateFileSystemEntries(path, pattern)
                             .Where(o => IsFileNameMatch(o, pattern))
                         : fileSystem.EnumerateFileSystemEntries(path, pattern))
-                        .ToArray();
+                        .ToList();
                 }
                 // for OS security
                 catch (UnauthorizedAccessException)
@@ -266,7 +266,7 @@ namespace Microsoft.Build.Shared
                 }
             }
 
-            return Array.Empty<string>();
+            return [];
         }
 
         /// <summary>
@@ -349,17 +349,17 @@ namespace Microsoft.Build.Shared
                     files = RemoveInitialDotSlash(files);
                 }
 
-                return files.ToArray();
+                return files.ToList();
             }
             catch (System.Security.SecurityException)
             {
                 // For code access security.
-                return Array.Empty<string>();
+                return [];
             }
             catch (System.UnauthorizedAccessException)
             {
                 // For OS security.
-                return Array.Empty<string>();
+                return [];
             }
         }
 
@@ -405,17 +405,17 @@ namespace Microsoft.Build.Shared
                     directories = RemoveInitialDotSlash(directories);
                 }
 
-                return directories.ToArray();
+                return directories.ToList();
             }
             catch (System.Security.SecurityException)
             {
                 // For code access security.
-                return Array.Empty<string>();
+                return [];
             }
             catch (System.UnauthorizedAccessException)
             {
                 // For OS security.
-                return Array.Empty<string>();
+                return [];
             }
         }
 
@@ -501,7 +501,7 @@ namespace Microsoft.Build.Shared
                     }
                     else
                     {
-                        // getFileSystemEntries(...) returns an empty enumerable if longPath doesn't exist.
+                        // getFileSystemEntries(...) returns an empty list if longPath doesn't exist.
                         IReadOnlyList<string> entries = getFileSystemEntries(FileSystemEntity.FilesAndDirectories, longPath, parts[i], null, false);
 
                         if (0 == entries.Count)
@@ -1042,7 +1042,7 @@ namespace Microsoft.Build.Shared
         {
             if (!stepResult.ConsiderFiles)
             {
-                return Enumerable.Empty<string>();
+                return [];
             }
 
             // Back-compat hack: We don't use case-insensitive file enumeration I/O on Linux so the behavior is different depending
@@ -1673,9 +1673,9 @@ namespace Microsoft.Build.Shared
         /// <param name="pattern">Pattern against which string is matched.</param>
         internal static bool IsMatch(ReadOnlySpan<char> input, string pattern)
         {
-            if (input == null)
+            if (input == ReadOnlySpan<char>.Empty)
             {
-                throw new ArgumentNullException(nameof(input));
+                ErrorUtilities.ThrowInternalError("Unexpected empty 'input' provided.");
             }
             if (pattern == null)
             {
@@ -1697,9 +1697,6 @@ namespace Microsoft.Build.Shared
             // Store the information whether the tail was checked when a pattern "*?" occurred
             bool tailChecked = false;
 
-#if MONO    // MONO doesn't support local functions
-            Func<char, char, int, int, bool> CompareIgnoreCase = (inputChar, patternChar, iIndex, pIndex) =>
-#else
             // Function for comparing two characters, ignoring case
             // PERF NOTE:
             // Having a local function instead of a variable increases the speed by approx. 2 times.
@@ -1708,7 +1705,6 @@ namespace Microsoft.Build.Shared
             // when we have to compare two non ASCII characters. Using just string.Compare for
             // character comparison, would reduce the speed by approx. 5 times.
             bool CompareIgnoreCase(ref ReadOnlySpan<char> input, int iIndex, int pIndex)
-#endif
             {
                 char inputChar = input[iIndex];
                 char patternChar = pattern[pIndex];
@@ -1728,9 +1724,6 @@ namespace Microsoft.Build.Shared
                 }
                 return MemoryExtensions.Equals(input.Slice(iIndex, 1), pattern.AsSpan(pIndex, 1), StringComparison.OrdinalIgnoreCase);
             }
-#if MONO
-            ; // The end of the CompareIgnoreCase anonymous function
-#endif
 
             while (inputIndex < inputLength)
             {
@@ -2347,18 +2340,18 @@ namespace Microsoft.Build.Shared
                     // - maintain legacy behaviour where an illegal filespec is treated as a normal string
                     if (FileUtilities.PathsEqual(filespecUnescaped, excludeSpec))
                     {
-                        return Array.Empty<string>();
+                        return [];
                     }
 
                     var match = Default.FileMatch(excludeSpec, filespecUnescaped);
 
                     if (match.isLegalFileSpec && match.isMatch)
                     {
-                        return Array.Empty<string>();
+                        return [];
                     }
                 }
             }
-            return new[] { filespecUnescaped };
+            return [filespecUnescaped];
         }
 
         /// <summary>
@@ -2384,7 +2377,7 @@ namespace Microsoft.Build.Shared
 
             if (action == SearchAction.ReturnEmptyList)
             {
-                return (Array.Empty<string>(), action, string.Empty);
+                return ([], action, string.Empty);
             }
             else if (action == SearchAction.ReturnFileSpec)
             {
@@ -2392,7 +2385,7 @@ namespace Microsoft.Build.Shared
             }
             else if (action == SearchAction.FailOnDriveEnumeratingWildcard)
             {
-                return (Array.Empty<string>(), action, string.Empty);
+                return ([], action, string.Empty);
             }
             else if ((action != SearchAction.RunSearch) && (action != SearchAction.LogDriveEnumeratingWildcard))
             {
@@ -2437,7 +2430,7 @@ namespace Microsoft.Build.Shared
                     }
                     else if (excludeAction == SearchAction.FailOnDriveEnumeratingWildcard)
                     {
-                        return (Array.Empty<string>(), excludeAction, excludeSpec);
+                        return ([], excludeAction, excludeSpec);
                     }
                     else if (excludeAction == SearchAction.LogDriveEnumeratingWildcard)
                     {

@@ -95,7 +95,7 @@ namespace Microsoft.Build.BackEnd
         /// <param name="packet">The packet to send.</param>
         protected void SendData(NodeContext context, INodePacket packet)
         {
-            ErrorUtilities.VerifyThrowArgumentNull(packet, nameof(packet));
+            ErrorUtilities.VerifyThrowArgumentNull(packet);
             context.SendData(packet);
         }
 
@@ -332,8 +332,8 @@ namespace Microsoft.Build.BackEnd
                     }
 #endif
                     // Create the node process
-                    NodeLauncher nodeLauncher = new NodeLauncher();
-                    Process msbuildProcess = nodeLauncher.Start(msbuildLocation, commandLineArgs);
+                    INodeLauncher nodeLauncher = (INodeLauncher)_componentHost.GetComponent(BuildComponentType.NodeLauncher);
+                    Process msbuildProcess = nodeLauncher.Start(msbuildLocation, commandLineArgs, nodeId);
                     _processesToIgnore.TryAdd(GetProcessesToIgnoreKey(hostHandshake, msbuildProcess.Id), default);
 
                     // Note, when running under IMAGEFILEEXECUTIONOPTIONS registry key to debug, the process ID
@@ -490,7 +490,7 @@ namespace Microsoft.Build.BackEnd
             nodeStream.Connect(timeout);
 
 #if !FEATURE_PIPEOPTIONS_CURRENTUSERONLY
-            if (NativeMethodsShared.IsWindows && !NativeMethodsShared.IsMono)
+            if (NativeMethodsShared.IsWindows)
             {
                 // Verify that the owner of the pipe is us.  This prevents a security hole where a remote node has
                 // been faked up with ACLs that would let us attach to it.  It could then issue fake build requests back to
@@ -514,7 +514,7 @@ namespace Microsoft.Build.BackEnd
 
             CommunicationsUtilities.Trace("Reading handshake from pipe {0}", pipeName);
 
-#if NETCOREAPP2_1_OR_GREATER || MONO
+#if NETCOREAPP2_1_OR_GREATER
             nodeStream.ReadEndOfHandshakeSignal(true, timeout);
 #else
             nodeStream.ReadEndOfHandshakeSignal(true);
@@ -598,7 +598,7 @@ namespace Microsoft.Build.BackEnd
             /// <summary>
             /// Per node read buffers
             /// </summary>
-            private SharedReadBuffer _sharedReadBuffer;
+            private BinaryReaderFactory _binaryReaderFactory;
 
             /// <summary>
             /// Constructor.
@@ -616,7 +616,7 @@ namespace Microsoft.Build.BackEnd
                 _readBufferMemoryStream = new MemoryStream();
                 _writeBufferMemoryStream = new MemoryStream();
                 _terminateDelegate = terminateDelegate;
-                _sharedReadBuffer = InterningBinaryReader.CreateSharedBuffer();
+                _binaryReaderFactory = InterningBinaryReader.CreateSharedBuffer();
             }
 
             /// <summary>
@@ -982,7 +982,7 @@ namespace Microsoft.Build.BackEnd
                     // Since the buffer is publicly visible dispose right away to discourage outsiders from holding a reference to it.
                     using (var packetStream = new MemoryStream(packetData, 0, packetLength, /*writeable*/ false, /*bufferIsPubliclyVisible*/ true))
                     {
-                        ITranslator readTranslator = BinaryTranslator.GetReadTranslator(packetStream, _sharedReadBuffer);
+                        ITranslator readTranslator = BinaryTranslator.GetReadTranslator(packetStream, _binaryReaderFactory);
                         _packetFactory.DeserializeAndRoutePacket(_nodeId, packetType, readTranslator);
                     }
                 }

@@ -13,6 +13,7 @@ using Microsoft.Build.Construction;
 using Microsoft.Build.Execution;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Graph;
+using Microsoft.Build.Logging;
 using Microsoft.Build.Shared;
 using Shouldly;
 using Xunit;
@@ -167,13 +168,13 @@ namespace Microsoft.Build.UnitTests
         [InlineData("terminallogger")]
         [InlineData("TerminalLogger")]
         [InlineData("TERMINALLOGGER")]
-        public void LiveLoggerSwitchIdentificationTests(string livelogger)
+        public void TerminalLoggerSwitchIdentificationTests(string terminallogger)
         {
             CommandLineSwitches.ParameterizedSwitch parameterlessSwitch;
             string duplicateSwitchErrorMessage;
 
-            CommandLineSwitches.IsParameterizedSwitch(livelogger, out parameterlessSwitch, out duplicateSwitchErrorMessage, out bool multipleParametersAllowed, out string missingParametersErrorMessage, out bool unquoteParameters, out bool emptyParametersAllowed).ShouldBeTrue();
-            parameterlessSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.LiveLogger);
+            CommandLineSwitches.IsParameterizedSwitch(terminallogger, out parameterlessSwitch, out duplicateSwitchErrorMessage, out bool multipleParametersAllowed, out string missingParametersErrorMessage, out bool unquoteParameters, out bool emptyParametersAllowed).ShouldBeTrue();
+            parameterlessSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.TerminalLogger);
             duplicateSwitchErrorMessage.ShouldBeNull();
             multipleParametersAllowed.ShouldBeTrue();
             missingParametersErrorMessage.ShouldBeNull();
@@ -197,6 +198,28 @@ namespace Microsoft.Build.UnitTests
 
             CommandLineSwitches.IsParameterizedSwitch(fileloggerparameters, out parameterizedSwitch, out duplicateSwitchErrorMessage, out multipleParametersAllowed, out missingParametersErrorMessage, out unquoteParameters, out emptyParametersAllowed).ShouldBeTrue();
             parameterizedSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.FileLoggerParameters);
+            duplicateSwitchErrorMessage.ShouldBeNull();
+            multipleParametersAllowed.ShouldBeFalse();
+            missingParametersErrorMessage.ShouldNotBeNull();
+            unquoteParameters.ShouldBeTrue();
+        }
+
+        [Theory]
+        [InlineData("tlp")]
+        [InlineData("TLP")]
+        [InlineData("terminalLoggerParameters")]
+        [InlineData("TERMINALLOGGERPARAMETERS")]
+        public void TerminalLoggerParametersIdentificationTests(string terminalLoggerParameters)
+        {
+            CommandLineSwitches.ParameterizedSwitch parameterizedSwitch;
+            string duplicateSwitchErrorMessage;
+            bool multipleParametersAllowed;
+            string missingParametersErrorMessage;
+            bool unquoteParameters;
+            bool emptyParametersAllowed;
+
+            CommandLineSwitches.IsParameterizedSwitch(terminalLoggerParameters, out parameterizedSwitch, out duplicateSwitchErrorMessage, out multipleParametersAllowed, out missingParametersErrorMessage, out unquoteParameters, out emptyParametersAllowed).ShouldBeTrue();
+            parameterizedSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.TerminalLoggerParameters);
             duplicateSwitchErrorMessage.ShouldBeNull();
             multipleParametersAllowed.ShouldBeFalse();
             missingParametersErrorMessage.ShouldNotBeNull();
@@ -477,6 +500,60 @@ namespace Microsoft.Build.UnitTests
             unquoteParameters.ShouldBeTrue();
         }
 
+        [Fact]
+        public void GetPropertySwitchIdentificationTest()
+        {
+            CommandLineSwitches.IsParameterizedSwitch(
+                "getProperty",
+                out CommandLineSwitches.ParameterizedSwitch parameterizedSwitch,
+                out string duplicateSwitchErrorMessage,
+                out bool multipleParametersAllowed,
+                out string missingParametersErrorMessage,
+                out _,
+                out _);
+
+            parameterizedSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.GetProperty);
+            duplicateSwitchErrorMessage.ShouldBeNull();
+            multipleParametersAllowed.ShouldBeTrue();
+            missingParametersErrorMessage.ShouldNotBeNullOrEmpty();
+        }
+
+        [Fact]
+        public void GetItemSwitchIdentificationTest()
+        {
+            CommandLineSwitches.IsParameterizedSwitch(
+                "getItem",
+                out CommandLineSwitches.ParameterizedSwitch parameterizedSwitch,
+                out string duplicateSwitchErrorMessage,
+                out bool multipleParametersAllowed,
+                out string missingParametersErrorMessage,
+                out _,
+                out _);
+
+            parameterizedSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.GetItem);
+            duplicateSwitchErrorMessage.ShouldBeNull();
+            multipleParametersAllowed.ShouldBeTrue();
+            missingParametersErrorMessage.ShouldNotBeNullOrEmpty();
+        }
+
+        [Fact]
+        public void GetTargetResultSwitchIdentificationTest()
+        {
+            CommandLineSwitches.IsParameterizedSwitch(
+                "getTargetResult",
+                out CommandLineSwitches.ParameterizedSwitch parameterizedSwitch,
+                out string duplicateSwitchErrorMessage,
+                out bool multipleParametersAllowed,
+                out string missingParametersErrorMessage,
+                out _,
+                out _);
+
+            parameterizedSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.GetTargetResult);
+            duplicateSwitchErrorMessage.ShouldBeNull();
+            multipleParametersAllowed.ShouldBeTrue();
+            missingParametersErrorMessage.ShouldNotBeNullOrEmpty();
+        }
+
         [Theory]
         [InlineData("targets")]
         [InlineData("tArGeTs")]
@@ -497,6 +574,26 @@ namespace Microsoft.Build.UnitTests
             missingParametersErrorMessage.ShouldBeNull();
             unquoteParameters.ShouldBeTrue();
             emptyParametersAllowed.ShouldBeFalse();
+        }
+
+        [Theory]
+        [InlineData("featureavailability")]
+        [InlineData("fa")]
+        public void FeatureAvailibilitySwitchIdentificationTest(string switchName)
+        {
+            CommandLineSwitches.IsParameterizedSwitch(
+                switchName,
+                out CommandLineSwitches.ParameterizedSwitch parameterizedSwitch,
+                out string duplicateSwitchErrorMessage,
+                out bool multipleParametersAllowed,
+                out string missingParametersErrorMessage,
+                out _,
+                out _);
+
+            parameterizedSwitch.ShouldBe(CommandLineSwitches.ParameterizedSwitch.FeatureAvailability);
+            duplicateSwitchErrorMessage.ShouldBeNull();
+            multipleParametersAllowed.ShouldBeTrue();
+            missingParametersErrorMessage.ShouldNotBeNullOrEmpty();
         }
 
         [Fact]
@@ -978,6 +1075,44 @@ namespace Microsoft.Build.UnitTests
             Assert.Equal("build", parameters[2]);
         }
 
+        /// <summary>
+        /// Verifies that the Target property is unquoted and parsed properly.
+        /// This will remove the possibility to have the ';' in the target name. 
+        /// </summary>
+        [Theory]
+        [InlineData("/t:Clean;Build", "\"Clean;Build\"")]
+        [InlineData("/t:Clean;Build", "Clean;Build")]
+        public void ParameterizedSwitchTargetQuotedTest(string commandLineArg, string switchParameters)
+        {
+            CommandLineSwitches switches = new CommandLineSwitches();
+            switches.SetParameterizedSwitch(CommandLineSwitches.ParameterizedSwitch.Target, commandLineArg, switchParameters, true, true, false);
+            switches.IsParameterizedSwitchSet(CommandLineSwitches.ParameterizedSwitch.Target).ShouldBeTrue();
+
+            switches[CommandLineSwitches.ParameterizedSwitch.Target].Length.ShouldBe(2);
+            switches[CommandLineSwitches.ParameterizedSwitch.Target][0].ShouldBe("Clean");
+            switches[CommandLineSwitches.ParameterizedSwitch.Target][1].ShouldBe("Build");
+            switches.GetParameterizedSwitchCommandLineArg(CommandLineSwitches.ParameterizedSwitch.Target).ShouldBe(commandLineArg);
+        }
+
+        /// <summary>
+        /// Verifies that the parsing behavior of quoted target properties is not changed when ChangeWave configured.
+        /// </summary>
+        [Fact]
+        public void ParameterizedSwitchTargetQuotedChangeWaveTest()
+        {
+            using (TestEnvironment env = TestEnvironment.Create())
+            {
+                env.SetEnvironmentVariable("MSBUILDDISABLEFEATURESFROMVERSION", "17.10");
+
+                CommandLineSwitches switches = new CommandLineSwitches();
+                switches.SetParameterizedSwitch(CommandLineSwitches.ParameterizedSwitch.Target, "/t:Clean;Build", "\"Clean;Build\"", true, true, false);
+                switches.IsParameterizedSwitchSet(CommandLineSwitches.ParameterizedSwitch.Target).ShouldBeTrue();
+
+                switches[CommandLineSwitches.ParameterizedSwitch.Target].Length.ShouldBe(1);
+                switches[CommandLineSwitches.ParameterizedSwitch.Target][0].ShouldBe("Clean;Build");
+            }
+        }
+
         [Fact]
         public void AppendParameterizedSwitchesTests3()
         {
@@ -1020,6 +1155,7 @@ namespace Microsoft.Build.UnitTests
                     filename = FileUtilities.GetTemporaryFileName();
                     ProjectRootElement project = ProjectRootElement.Create();
                     project.Save(filename);
+                    BuildResult buildResult = null;
                     MSBuildApp.BuildProject(
                                         filename,
                                         null,
@@ -1049,8 +1185,14 @@ namespace Microsoft.Build.UnitTests
                                         graphBuildOptions: null,
                                         lowPriority: false,
                                         question: false,
+                                        isBuildCheckEnabled: false,
                                         inputResultsCaches: null,
                                         outputResultsCache: null,
+                                        saveProjectResult: false,
+                                        ref buildResult,
+#if FEATURE_REPORTFILEACCESSES
+                                        reportFileAccesses: false,
+#endif
                                         commandLine: null);
                 }
                 finally
@@ -1370,22 +1512,23 @@ namespace Microsoft.Build.UnitTests
         }
 
         /// <summary>
-        /// Verifies that when the /profileevaluation switch is used with invalid filenames an error is shown.
+        /// Verifies that the /target switch is parsed properly with invalid characters.
         /// </summary>
-        [MemberData(nameof(GetInvalidFilenames))]
-        [WindowsFullFrameworkOnlyTheory(additionalMessage: ".NET Core 2.1+ no longer validates paths: https://github.com/dotnet/corefx/issues/27779#issuecomment-371253486.")]
-        public void ProcessProfileEvaluationInvalidFilename(string filename)
+        [Fact]
+        public void ProcessInvalidTargetSwitch()
         {
-            bool enableProfiler = false;
-            Should.Throw(
-                () => MSBuildApp.ProcessProfileEvaluationSwitch(new[] { filename }, new List<ILogger>(), out enableProfiler),
-                typeof(CommandLineSwitchException));
-        }
+            string projectContent = """
+                <Project>
+                </Project>
+                """;
+            using TestEnvironment testEnvironment = TestEnvironment.Create();
+            string project = testEnvironment.CreateTestProjectWithFiles("project.proj", projectContent).ProjectFile;
 
-        public static IEnumerable<object[]> GetInvalidFilenames()
-        {
-            yield return new object[] { $"a_file_with${Path.GetInvalidFileNameChars().First()}invalid_chars" };
-            yield return new object[] { $"C:\\a_path\\with{Path.GetInvalidPathChars().First()}invalid\\chars" };
+#if FEATURE_GET_COMMANDLINE
+            MSBuildApp.Execute(@"msbuild.exe " + project + " /t:foo.bar").ShouldBe(MSBuildApp.ExitType.SwitchError);
+#else
+            MSBuildApp.Execute(new[] { @"msbuild.exe", project, "/t:foo.bar" }).ShouldBe(MSBuildApp.ExitType.SwitchError);
+#endif
         }
 
         /// <summary>

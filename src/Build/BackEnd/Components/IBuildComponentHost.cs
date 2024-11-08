@@ -130,6 +130,23 @@ namespace Microsoft.Build.BackEnd
         /// The SDK resolution service.
         /// </summary>
         SdkResolverService,
+
+#if FEATURE_REPORTFILEACCESSES
+        /// <summary>
+        /// The component which is the sink for file access reports and forwards reports to other components.
+        /// </summary>
+        FileAccessManager,
+#endif
+
+        /// <summary>
+        /// The component which launches new MSBuild nodes.
+        /// </summary>
+        NodeLauncher,
+
+        /// <summary>
+        /// The Build Check Manager.
+        /// </summary>
+        BuildCheckManagerProvider,
     }
 
     /// <summary>
@@ -177,6 +194,15 @@ namespace Microsoft.Build.BackEnd
         /// <param name="type">The component type to be retrieved</param>
         /// <returns>The component</returns>
         IBuildComponent GetComponent(BuildComponentType type);
+
+        /// <summary>
+        /// Gets an instance of the specified component type from the host.
+        /// </summary>
+        /// <typeparam name="TComponent"></typeparam>
+        /// <param name="type">The component type to be retrieved</param>
+        /// <returns>The component</returns>
+        TComponent GetComponent<TComponent>(BuildComponentType type)
+            where TComponent : IBuildComponent;
 
         #endregion
     }
